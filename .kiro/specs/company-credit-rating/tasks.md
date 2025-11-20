@@ -135,7 +135,7 @@
   - Test file uploads with metadata
   - _Requirements: 6.1, 8.3, 8.4, 8.5_
 
-- [ ] 8. Implement API endpoints
+- [x] 8. Implement API endpoints
   - Create Flask blueprints in app/routes/ for API organization
   - Create POST /api/companies/search endpoint for company search
   - Create POST /api/ratings/generate endpoint for rating generation
@@ -159,7 +159,7 @@
   - Test error handling
   - _Requirements: 1.1, 1.2, 2.4, 6.2_
 
-- [ ] 9. Checkpoint - Ensure all tests pass
+- [-] 9. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 10. Implement error handling and logging

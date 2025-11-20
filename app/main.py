@@ -34,11 +34,46 @@ def create_app() -> Flask:
         doc='/api/docs'
     )
     
-    # Register blueprints/namespaces here
-    # from app.routes import register_routes
-    # register_routes(api)
+    # Register blueprints/namespaces
+    from app.routes import register_routes
+    register_routes(api)
+    
+    # Register error handlers
+    register_error_handlers(app)
     
     return app
+
+
+def register_error_handlers(app: Flask) -> None:
+    """Register custom error handlers.
+    
+    Args:
+        app: Flask application instance
+    """
+    @app.errorhandler(404)
+    def not_found(error):
+        """Handle 404 errors."""
+        return {
+            'error': 'Not found',
+            'details': 'The requested resource was not found'
+        }, 404
+    
+    @app.errorhandler(500)
+    def internal_error(error):
+        """Handle 500 errors."""
+        return {
+            'error': 'Internal server error',
+            'details': 'An unexpected error occurred'
+        }, 500
+    
+    @app.errorhandler(Exception)
+    def handle_exception(error):
+        """Handle uncaught exceptions."""
+        app.logger.error(f"Unhandled exception: {error}", exc_info=True)
+        return {
+            'error': 'Internal server error',
+            'details': 'An unexpected error occurred'
+        }, 500
 
 
 if __name__ == '__main__':

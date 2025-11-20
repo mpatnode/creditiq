@@ -31,6 +31,18 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 
+def get_db_session() -> Session:
+    """Get a new database session.
+    
+    Returns:
+        Session: SQLAlchemy database session
+        
+    Note:
+        Caller is responsible for closing the session.
+    """
+    return SessionLocal()
+
+
 def init_db() -> None:
     """Initialize database tables."""
     Base.metadata.create_all(bind=engine)
