@@ -55,7 +55,7 @@
   - Test error handling for API failures
   - _Requirements: 1.1, 4.1, 4.2_
 
-- [-] 5. Implement Box AI Service component
+- [x] 5. Implement Box AI Service component
   - Create BoxAIService class in services/box_ai_service.py that uses BoxMCPClient
   - Implement apply_methodology method that:
     - Uploads financial data as a temporary document to Box
@@ -79,7 +79,7 @@
   - Test financial data document upload
   - _Requirements: 3.2, 3.3_
 
-- [ ] 6. Implement Rating Engine component
+- [-] 6. Implement Rating Engine component
   - Create RatingEngine class in services/rating_engine.py that orchestrates the rating workflow
   - Implement calculate_rating method that coordinates:
     - Financial data retrieval via FinancialDataRetriever
