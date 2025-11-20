@@ -33,7 +33,7 @@
   - Test caching behavior
   - _Requirements: 3.1, 8.2_
 
-- [ ] 4. Implement Financial Data Retriever component
+- [x] 4. Implement Financial Data Retriever component
   - Create FinancialDataRetriever class in services/financial_data_retriever.py with provider integration (e.g., Alpha Vantage or Financial Modeling Prep)
   - Implement get_company_data method to fetch financial statements using requests library
   - Implement search_companies method for company lookup
@@ -55,7 +55,7 @@
   - Test error handling for API failures
   - _Requirements: 1.1, 4.1, 4.2_
 
-- [ ] 5. Implement Box AI Service component
+- [-] 5. Implement Box AI Service component
   - Create BoxAIService class in services/box_ai_service.py that uses BoxMCPClient
   - Implement apply_methodology method that:
     - Uploads financial data as a temporary document to Box

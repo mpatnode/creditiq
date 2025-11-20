@@ -28,8 +28,9 @@ class Config:
     LLM_TIMEOUT: int = int(os.getenv('LLM_TIMEOUT', '60'))
     
     # Financial Data Provider
-    FINANCIAL_DATA_PROVIDER: str = os.getenv('FINANCIAL_DATA_PROVIDER', 'alpha_vantage')
-    ALPHA_VANTAGE_API_KEY: Optional[str] = os.getenv('ALPHA_VANTAGE_API_KEY')
+    FINANCIAL_DATA_PROVIDER: str = os.getenv('FINANCIAL_DATA_PROVIDER', 'sec_edgar')
+    # SEC EDGAR requires User-Agent with contact info
+    SEC_USER_AGENT: str = os.getenv('SEC_USER_AGENT', 'CompanyCreditRating/1.0 (contact@example.com)')
     
     # Application Settings
     MAX_RETRIES: int = int(os.getenv('MAX_RETRIES', '3'))
