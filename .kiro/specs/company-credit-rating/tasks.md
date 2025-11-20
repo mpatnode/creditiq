@@ -171,26 +171,26 @@
   - Test logging behavior
   - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5_
 
-- [ ] 11. Implement React frontend
-  - Set up React TypeScript project with Material-UI or Tailwind CSS
-  - Create company search component with autocomplete
-  - Create rating display component with visual indicators (letter grade, color coding)
-  - Create methodology breakdown visualization
-  - Create historical ratings timeline component
+- [ ] 11. Implement frontend interface
+  - Create Flask templates in templates/ using Jinja2 with Bootstrap or Tailwind CSS
+  - Create company search page with autocomplete using JavaScript
+  - Create rating display page with visual indicators (letter grade, color coding)
+  - Create methodology breakdown visualization using Chart.js
+  - Create historical ratings timeline page
   - Add loading states and error message displays
-  - Integrate with backend API endpoints
+  - Integrate with backend API endpoints using fetch or axios
   - _Requirements: 1.3, 1.5, 2.1, 2.2, 2.3, 6.3_
 
-- [ ]* 11.1 Write unit tests for React components
-  - Test company search component
-  - Test rating display component
-  - Test historical ratings component
+- [ ]* 11.1 Write unit tests for Flask routes
+  - Test template rendering
+  - Test context data passed to templates
+  - Test error handling in routes
   - _Requirements: 1.3, 2.1, 6.3_
 
 - [ ] 12. Implement optional structured methodology conversion tool
-  - Create convertMethodologyToStructured method in LLMService
-  - Implement CLI tool to convert PDF to structured JSON format
-  - Add validation for structured methodology format
+  - Create convert_methodology_to_structured method in LLMService
+  - Implement CLI tool using Click or argparse to convert PDF to structured JSON format
+  - Add validation for structured methodology format using Pydantic
   - Implement fallback logic to use PDF if structured format is invalid
   - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5_
 
@@ -208,9 +208,10 @@
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 14. Create deployment configuration
-  - Create Dockerfile for application
+  - Create Dockerfile for Flask application
   - Create docker-compose.yml for local development with PostgreSQL and Box MCP server
-  - Document Box MCP server setup and configuration
+  - Document Box MCP server setup and configuration in README.md
   - Create environment variable template (.env.example)
+  - Create requirements.txt or pyproject.toml with all dependencies
   - Write deployment documentation
   - _Requirements: 8.1_
