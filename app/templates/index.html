@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title %}Home - Company Credit Rating System{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+        <div class="text-center mb-5">
+            <h1 class="display-4 mb-3">Company Credit Rating System</h1>
+            <p class="lead text-muted">
+                Generate comprehensive credit ratings for public companies using AI-powered analysis
+            </p>
+        </div>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-body p-4">
+                <h5 class="card-title mb-3">Get Started</h5>
+                <p class="card-text">
+                    Search for a company by name or ticker symbol to generate a credit rating based on 
+                    current financial data and our proven methodology.
+                </p>
+                <a href="{{ url_for('search') }}" class="btn btn-primary btn-lg">
+                    Search Companies
+                </a>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="bi bi-search"></i> Search
+                        </h5>
+                        <p class="card-text">
+                            Find companies by name or ticker symbol with intelligent autocomplete
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="bi bi-graph-up"></i> Analyze
+                        </h5>
+                        <p class="card-text">
+                            Generate ratings based on comprehensive financial metrics and market data
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="bi bi-clock-history"></i> Track
+                        </h5>
+                        <p class="card-text">
+                            View historical ratings to track creditworthiness changes over time
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

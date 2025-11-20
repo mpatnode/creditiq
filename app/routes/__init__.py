@@ -12,6 +12,6 @@ def register_routes(api: Api) -> None:
     Args:
         api: Flask-RESTX Api instance
     """
-    api.add_namespace(companies_ns, path='/api/companies')
-    api.add_namespace(ratings_ns, path='/api/ratings')
-    api.add_namespace(methodology_ns, path='/api/methodology')
+    api.add_namespace(companies_ns, path='/companies')
+    api.add_namespace(ratings_ns, path='/ratings')
+    api.add_namespace(methodology_ns, path='/methodology')

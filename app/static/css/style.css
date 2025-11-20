@@ -1,0 +1,200 @@
+/* Custom styles for Credit Rating System */
+
+:root {
+    --rating-aaa: #28a745;
+    --rating-aa: #5cb85c;
+    --rating-a: #5bc0de;
+    --rating-bbb: #0275d8;
+    --rating-bb: #f0ad4e;
+    --rating-b: #ec971f;
+    --rating-ccc: #d9534f;
+    --rating-cc: #c9302c;
+    --rating-c: #ac2925;
+    --rating-d: #761c19;
+}
+
+body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+main {
+    flex: 1;
+}
+
+/* Rating Grade Colors */
+.rating-AAA { color: var(--rating-aaa); }
+.rating-AA { color: var(--rating-aa); }
+.rating-A { color: var(--rating-a); }
+.rating-BBB { color: var(--rating-bbb); }
+.rating-BB { color: var(--rating-bb); }
+.rating-B { color: var(--rating-b); }
+.rating-CCC { color: var(--rating-ccc); }
+.rating-CC { color: var(--rating-cc); }
+.rating-C { color: var(--rating-c); }
+.rating-D { color: var(--rating-d); }
+
+/* Rating Badge Colors */
+.badge.rating-AAA { background-color: var(--rating-aaa) !important; }
+.badge.rating-AA { background-color: var(--rating-aa) !important; }
+.badge.rating-A { background-color: var(--rating-a) !important; }
+.badge.rating-BBB { background-color: var(--rating-bbb) !important; }
+.badge.rating-BB { background-color: var(--rating-bb) !important; }
+.badge.rating-B { background-color: var(--rating-b) !important; }
+.badge.rating-CCC { background-color: var(--rating-ccc) !important; }
+.badge.rating-CC { background-color: var(--rating-cc) !important; }
+.badge.rating-C { background-color: var(--rating-c) !important; }
+.badge.rating-D { background-color: var(--rating-d) !important; }
+
+/* Autocomplete */
+#autocompleteResults {
+    position: absolute;
+    z-index: 1000;
+    max-height: 300px;
+    overflow-y: auto;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+#autocompleteResults .list-group-item {
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+#autocompleteResults .list-group-item:hover {
+    background-color: #f8f9fa;
+}
+
+/* Company Card */
+.company-card {
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.company-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Metric Cards */
+.metric-card {
+    padding: 1rem;
+    border-radius: 0.5rem;
+    background-color: #f8f9fa;
+    margin-bottom: 1rem;
+}
+
+.metric-label {
+    font-size: 0.875rem;
+    color: #6c757d;
+    margin-bottom: 0.25rem;
+}
+
+.metric-value {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #212529;
+}
+
+/* Breakdown Item */
+.breakdown-item {
+    padding: 1rem;
+    border-left: 4px solid #0d6efd;
+    background-color: #f8f9fa;
+    margin-bottom: 1rem;
+    border-radius: 0.25rem;
+}
+
+.breakdown-category {
+    font-weight: 600;
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+}
+
+.breakdown-score {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    background-color: #0d6efd;
+    color: white;
+    border-radius: 1rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.breakdown-weight {
+    color: #6c757d;
+    font-size: 0.875rem;
+}
+
+.breakdown-reasoning {
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+    color: #495057;
+}
+
+/* Timeline Item */
+.timeline-item {
+    position: relative;
+    padding-left: 2rem;
+    padding-bottom: 2rem;
+    border-left: 2px solid #dee2e6;
+}
+
+.timeline-item:last-child {
+    border-left: none;
+    padding-bottom: 0;
+}
+
+.timeline-marker {
+    position: absolute;
+    left: -0.5rem;
+    top: 0;
+    width: 1rem;
+    height: 1rem;
+    border-radius: 50%;
+    background-color: #0d6efd;
+    border: 2px solid white;
+}
+
+.timeline-content {
+    background-color: #f8f9fa;
+    padding: 1rem;
+    border-radius: 0.5rem;
+}
+
+/* Loading States */
+.spinner-border-sm {
+    width: 1rem;
+    height: 1rem;
+    border-width: 0.15em;
+}
+
+/* Error Messages */
+.alert {
+    border-radius: 0.5rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .display-1 {
+        font-size: 3rem;
+    }
+    
+    .metric-card {
+        margin-bottom: 0.75rem;
+    }
+}
+
+/* Chart container */
+canvas {
+    max-height: 400px;
+}
+
+/* Box links */
+a[href^="https://app.box.com"] {
+    color: #0061d5;
+}
+
+a[href^="https://app.box.com"]:hover {
+    color: #004ba0;
+}

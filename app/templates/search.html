@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Search Companies - Company Credit Rating System{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+        <h1 class="mb-4">Search Companies</h1>
+        
+        <!-- Search Form -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                <form id="searchForm">
+                    <div class="mb-3">
+                        <label for="companySearch" class="form-label">Company Name or Ticker</label>
+                        <input 
+                            type="text" 
+                            class="form-control form-control-lg" 
+                            id="companySearch" 
+                            placeholder="e.g., Apple or AAPL"
+                            autocomplete="off"
+                        >
+                        <div class="form-text">Enter a company name or ticker symbol to search</div>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <span class="spinner-border spinner-border-sm d-none" id="searchSpinner"></span>
+                        Search
+                    </button>
+                </form>
+                
+                <!-- Autocomplete Results -->
+                <div id="autocompleteResults" class="list-group mt-3 d-none"></div>
+            </div>
+        </div>
+
+        <!-- Search Results -->
+        <div id="searchResults" class="d-none">
+            <h3 class="mb-3">Search Results</h3>
+            <div id="resultsContainer"></div>
+        </div>
+
+        <!-- Error Message -->
+        <div id="errorMessage" class="alert alert-danger d-none" role="alert"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/search.js') }}"></script>
+{% endblock %}

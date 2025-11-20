@@ -84,17 +84,18 @@ error_model = ratings_ns.model('Error', {
 })
 
 
-def _get_services():
-    """Initialize and return service instances.
+async def _get_services_async():
+    """Initialize and return service instances (async version).
     
     Returns:
-        Tuple of (rating_engine, rating_storage, financial_data_retriever)
+        Tuple of (rating_engine, rating_storage, financial_data_retriever, box_client)
     """
     # Get configuration
     config = Config()
     
-    # Initialize Box MCP client
+    # Initialize Box MCP client and connect
     box_client = BoxMCPClient()
+    await box_client.connect_to_mcp()
     
     # Initialize services
     financial_data_retriever = FinancialDataRetriever(
@@ -127,7 +128,7 @@ def _get_services():
         ratings_root_folder_id=config.BOX_RATINGS_FOLDER_ID
     )
     
-    return rating_engine, rating_storage, financial_data_retriever
+    return rating_engine, rating_storage, financial_data_retriever, box_client
 
 
 @ratings_ns.route('/generate')
@@ -168,42 +169,40 @@ class RatingGenerate(Resource):
             
             logger.info(f"Generating rating for company: {identifier}")
             
-            # Initialize services
-            rating_engine, rating_storage, financial_data_retriever = _get_services()
-            
-            # Search for company
-            companies = financial_data_retriever.search_companies(identifier)
-            
-            if not companies:
-                return {
-                    'error': 'Company not found',
-                    'details': f'No company found matching: {identifier}'
-                }, 404
-            
-            # Use first match
-            company = companies[0]
-            
-            logger.info(f"Found company: {company.name} ({company.ticker})")
-            
-            # Generate rating (async operation)
+            # Run async workflow
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             try:
+                # Initialize services (connects to MCP)
+                rating_engine, rating_storage, financial_data_retriever, box_client = loop.run_until_complete(
+                    _get_services_async()
+                )
+                
+                # Search for company
+                companies = financial_data_retriever.search_companies(identifier)
+                
+                if not companies:
+                    return {
+                        'error': 'Company not found',
+                        'details': f'No company found matching: {identifier}'
+                    }, 404
+                
+                # Use first match
+                company = companies[0]
+                
+                logger.info(f"Found company: {company.name} ({company.ticker})")
+                
+                # Generate rating
                 rating_result = loop.run_until_complete(
                     rating_engine.calculate_rating(company)
                 )
-            finally:
-                loop.close()
-            
-            logger.info(f"Rating generated: {rating_result.rating}")
-            
-            # Save rating to database
-            db_rating = rating_storage.save_rating(rating_result)
-            
-            # Upload rating package to Box (async operation)
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
+                
+                logger.info(f"Rating generated: {rating_result.rating}")
+                
+                # Save rating to database
+                db_rating = rating_storage.save_rating(rating_result)
+                
+                # Upload rating package to Box
                 package_info = loop.run_until_complete(
                     rating_storage.save_rating_package_to_box(
                         rating=rating_result,
@@ -211,16 +210,20 @@ class RatingGenerate(Resource):
                         source_documents=rating_result.source_documents
                     )
                 )
+                
+                # Update rating with Box information
+                db_rating = rating_storage.update_rating_with_box_info(
+                    rating_id=db_rating.id,
+                    package_info=package_info
+                )
+                
+                logger.info(f"Rating saved successfully (ID: {db_rating.id})")
+                
+                # Disconnect from MCP
+                loop.run_until_complete(box_client.disconnect())
+                
             finally:
                 loop.close()
-            
-            # Update rating with Box information
-            db_rating = rating_storage.update_rating_with_box_info(
-                rating_id=db_rating.id,
-                package_info=package_info
-            )
-            
-            logger.info(f"Rating saved successfully (ID: {db_rating.id})")
             
             return {
                 'rating': db_rating.to_dict(),
@@ -272,8 +275,17 @@ class RatingHistory(Resource):
         try:
             logger.info(f"Retrieving historical ratings for company: {company_id}")
             
-            # Initialize rating storage
-            _, rating_storage, _ = _get_services()
+            # Initialize rating storage (no Box client needed for history)
+            config = Config()
+            db_session = get_db_session()
+            
+            # Create a minimal rating storage without Box client for read-only operations
+            from services.rating_storage import RatingStorage
+            rating_storage = RatingStorage(
+                db_session=db_session,
+                box_client=None,  # Not needed for reading history
+                ratings_root_folder_id=config.BOX_RATINGS_FOLDER_ID
+            )
             
             # Get historical ratings
             ratings = rating_storage.get_historical_ratings(company_id)

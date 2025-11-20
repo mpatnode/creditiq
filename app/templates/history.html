@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Rating History - Company Credit Rating System{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-10 mx-auto">
+        <!-- Loading State -->
+        <div id="loadingState" class="text-center py-5">
+            <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-3 text-muted">Loading rating history...</p>
+        </div>
+
+        <!-- History Display -->
+        <div id="historyDisplay" class="d-none">
+            <!-- Company Header -->
+            <div class="mb-4">
+                <h1 class="mb-1" id="companyName"></h1>
+                <p class="text-muted mb-0">
+                    <span id="companyTicker"></span> | 
+                    <span id="companyId"></span>
+                </p>
+            </div>
+
+            <!-- Timeline Chart -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h5 class="card-title mb-4">Rating Timeline</h5>
+                    <canvas id="timelineChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Ratings List -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h5 class="card-title mb-4">Historical Ratings</h5>
+                    <div id="ratingsContainer"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="text-center py-5 d-none">
+            <h3 class="text-muted mb-3">No Ratings Found</h3>
+            <p class="text-muted">This company doesn't have any historical ratings yet.</p>
+            <a href="{{ url_for('search') }}" class="btn btn-primary">Generate Rating</a>
+        </div>
+
+        <!-- Error Message -->
+        <div id="errorMessage" class="alert alert-danger d-none" role="alert"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/history.js') }}"></script>
+{% endblock %}

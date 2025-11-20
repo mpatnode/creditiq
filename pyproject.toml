@@ -38,6 +38,7 @@ python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = "-v --cov=app --cov=models --cov=services"
+asyncio_mode = "auto"
 
 [tool.black]
 line-length = 100

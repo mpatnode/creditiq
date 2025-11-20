@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -17,6 +15,64 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - credit_rating_network
+
+  box-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp
+    container_name: box_mcp_server
+    volumes:
+      - ./.box_config.json:/mcp/server/.box_config.json:ro
+      - ./.env:/mcp/server/.env:ro
+    ports:
+      - "8005:8005"
+    networks:
+      - credit_rating_network
+    restart: unless-stopped
+    
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: credit_rating_app
+    environment:
+      - FLASK_ENV=production
+      - DATABASE_URL=postgresql://credit_rating_user:credit_rating_pass@postgres:5432/credit_rating_db
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - BOX_MCP_SERVER_URL=http://box-mcp:8005/sse
+      - BOX_CLIENT_ID=${BOX_CLIENT_ID}
+      - BOX_CLIENT_SECRET=${BOX_CLIENT_SECRET}
+      - BOX_ENTERPRISE_ID=${BOX_ENTERPRISE_ID}
+      - BOX_METHODOLOGY_FOLDER_ID=${BOX_METHODOLOGY_FOLDER_ID}
+      - BOX_RATINGS_FOLDER_ID=${BOX_RATINGS_FOLDER_ID}
+      - BOX_AI_MODE=${BOX_AI_MODE:-multiple_item_qa}
+      - BOX_AI_TEMPERATURE=${BOX_AI_TEMPERATURE:-0.1}
+      - FINANCIAL_DATA_PROVIDER=${FINANCIAL_DATA_PROVIDER:-sec_edgar}
+      - MAX_RETRIES=${MAX_RETRIES:-3}
+      - RETRY_BACKOFF_FACTOR=${RETRY_BACKOFF_FACTOR:-2}
+      - REQUEST_TIMEOUT=${REQUEST_TIMEOUT:-30}
+      - LLM_TIMEOUT=${LLM_TIMEOUT:-60}
+      - DATA_AGE_THRESHOLD_MONTHS=${DATA_AGE_THRESHOLD_MONTHS:-12}
+    ports:
+      - "8080:5000"
+    volumes:
+      - ./logs:/app/logs
+      - ./models:/app/models
+      - ./mcp:/app/mcp
+      - ${BOX_CONFIG_PATH:-./box_config.json}:/app/box_config.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - credit_rating_network
+    restart: unless-stopped
 
 volumes:
   postgres_data:
+
+networks:
+  credit_rating_network:
+    driver: bridge

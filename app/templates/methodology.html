@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block title %}Methodology - Company Credit Rating System{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+        <h1 class="mb-4">Credit Rating Methodology</h1>
+
+        <!-- Loading State -->
+        <div id="loadingState" class="text-center py-5">
+            <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-3 text-muted">Loading methodology information...</p>
+        </div>
+
+        <!-- Methodology Display -->
+        <div id="methodologyDisplay" class="d-none">
+            <!-- Overview -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">Overview</h5>
+                    <p class="card-text">
+                        Our credit rating system uses a comprehensive methodology that analyzes multiple 
+                        financial metrics and market indicators to assess a company's creditworthiness. 
+                        The methodology is powered by AI analysis of financial data combined with 
+                        established credit rating principles.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Methodology Info -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h5 class="card-title mb-3">Methodology Details</h5>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p class="mb-2">
+                                <strong>Version:</strong> 
+                                <span id="methodologyVersion"></span>
+                            </p>
+                            <p class="mb-2">
+                                <strong>File ID:</strong> 
+                                <span id="methodologyFileId" class="font-monospace small"></span>
+                            </p>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="mb-2">
+                                <strong>Status:</strong> 
+                                <span id="methodologyStatus"></span>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Content Preview -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h5 class="card-title mb-3">Methodology Content Preview</h5>
+                    <div class="bg-light p-3 rounded">
+                        <pre id="methodologyPreview" class="mb-0" style="white-space: pre-wrap; font-size: 0.9rem;"></pre>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Key Components -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h5 class="card-title mb-3">Key Rating Components</h5>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <h6>Leverage Ratios</h6>
+                            <ul class="small">
+                                <li>Debt to Equity</li>
+                                <li>Debt to Assets</li>
+                                <li>Interest Coverage</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <h6>Profitability Ratios</h6>
+                            <ul class="small">
+                                <li>Return on Equity</li>
+                                <li>Return on Assets</li>
+                                <li>Net Profit Margin</li>
+                                <li>Operating Margin</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <h6>Liquidity Ratios</h6>
+                            <ul class="small">
+                                <li>Current Ratio</li>
+                                <li>Quick Ratio</li>
+                                <li>Cash Ratio</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <h6>Market Metrics</h6>
+                            <ul class="small">
+                                <li>Market Capitalization</li>
+                                <li>Price to Earnings</li>
+                                <li>Price to Book</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rating Scale -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h5 class="card-title mb-3">Rating Scale</h5>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Rating</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="table-success">
+                                    <td><strong>AAA, AA</strong></td>
+                                    <td>Highest credit quality, minimal credit risk</td>
+                                </tr>
+                                <tr class="table-info">
+                                    <td><strong>A, BBB</strong></td>
+                                    <td>Good credit quality, low to moderate credit risk</td>
+                                </tr>
+                                <tr class="table-warning">
+                                    <td><strong>BB, B</strong></td>
+                                    <td>Speculative, elevated credit risk</td>
+                                </tr>
+                                <tr class="table-danger">
+                                    <td><strong>CCC, CC, C, D</strong></td>
+                                    <td>High credit risk, vulnerable to default</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error Message -->
+        <div id="errorMessage" class="alert alert-danger d-none" role="alert"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/methodology.js') }}"></script>
+{% endblock %}

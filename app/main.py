@@ -1,7 +1,7 @@
 """Main Flask application factory."""
 import os
 import logging
-from flask import Flask, jsonify
+from flask import Flask, jsonify, render_template
 from flask_cors import CORS
 from flask_restx import Api
 from dotenv import load_dotenv
@@ -34,13 +34,17 @@ def create_app() -> Flask:
     # Enable CORS
     CORS(app)
     
+    # Register web routes first (before API)
+    register_web_routes(app)
+    
     # Initialize Flask-RESTX API
     api = Api(
         app,
         version='1.0',
         title='Company Credit Rating API',
         description='API for generating credit ratings for public companies',
-        doc='/api/docs'
+        doc='/api/docs',
+        prefix='/api'  # Add prefix to avoid conflicts with web routes
     )
     
     # Register blueprints/namespaces
@@ -53,6 +57,38 @@ def create_app() -> Flask:
     logger.info("Flask application created successfully")
     
     return app
+
+
+def register_web_routes(app: Flask) -> None:
+    """Register web page routes.
+    
+    Args:
+        app: Flask application instance
+    """
+    @app.route('/')
+    def index():
+        """Home page."""
+        return render_template('index.html')
+    
+    @app.route('/search')
+    def search():
+        """Company search page."""
+        return render_template('search.html')
+    
+    @app.route('/rating')
+    def rating():
+        """Rating display page."""
+        return render_template('rating.html')
+    
+    @app.route('/history')
+    def history():
+        """Historical ratings page."""
+        return render_template('history.html')
+    
+    @app.route('/methodology')
+    def methodology():
+        """Methodology information page."""
+        return render_template('methodology.html')
 
 
 def register_error_handlers(app: Flask) -> None:

@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block title %}Rating - {{ company_name }} - Company Credit Rating System{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-10 mx-auto">
+        <!-- Loading State -->
+        <div id="loadingState" class="text-center py-5">
+            <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-3 text-muted">Generating credit rating...</p>
+            <p class="text-muted small">This may take a minute as we analyze financial data</p>
+        </div>
+
+        <!-- Rating Display -->
+        <div id="ratingDisplay" class="d-none">
+            <!-- Company Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1 class="mb-1" id="companyName"></h1>
+                    <p class="text-muted mb-0">
+                        <span id="companyTicker"></span> | 
+                        <span id="companyId"></span>
+                    </p>
+                </div>
+                <div>
+                    <a href="#" id="viewHistoryLink" class="btn btn-outline-primary">
+                        View History
+                    </a>
+                </div>
+            </div>
+
+            <!-- Rating Card -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-body text-center py-5">
+                    <h2 class="text-muted mb-2">Credit Rating</h2>
+                    <div class="display-1 fw-bold mb-3" id="ratingGrade"></div>
+                    <div class="mb-3">
+                        <span class="badge bg-secondary fs-5" id="ratingScore"></span>
+                    </div>
+                    <p class="text-muted mb-0" id="ratingTimestamp"></p>
+                </div>
+            </div>
+
+            <!-- Reasoning -->
+            <div class="card shadow-sm mb-4" id="reasoningCard">
+                <div class="card-body">
+                    <h5 class="card-title">Analysis Summary</h5>
+                    <p class="card-text" id="reasoningText"></p>
+                </div>
+            </div>
+
+            <!-- Financial Metrics -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h5 class="card-title mb-4">Key Financial Metrics</h5>
+                    <div class="row" id="metricsContainer"></div>
+                </div>
+            </div>
+
+            <!-- Methodology Breakdown -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h5 class="card-title mb-4">Methodology Breakdown</h5>
+                    <div id="breakdownContainer"></div>
+                    <canvas id="breakdownChart" class="mt-4"></canvas>
+                </div>
+            </div>
+
+            <!-- Metadata -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h5 class="card-title mb-3">Rating Information</h5>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p class="mb-2">
+                                <strong>Methodology Version:</strong> 
+                                <span id="methodologyVersion"></span>
+                            </p>
+                            <p class="mb-2">
+                                <strong>Confidence:</strong> 
+                                <span id="confidenceScore"></span>
+                            </p>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="mb-2">
+                                <strong>Box Folder:</strong> 
+                                <a href="#" id="boxFolderLink" target="_blank">View in Box</a>
+                            </p>
+                            <p class="mb-2">
+                                <strong>Report:</strong> 
+                                <a href="#" id="boxReportLink" target="_blank">Download Report</a>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error Message -->
+        <div id="errorMessage" class="alert alert-danger d-none" role="alert"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/rating.js') }}"></script>
+{% endblock %}
