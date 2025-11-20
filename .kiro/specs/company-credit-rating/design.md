@@ -4,7 +4,7 @@
 
 The Company Credit Rating System is a web application that generates credit ratings for public companies by combining financial data retrieval with LLM-based methodology interpretation. The system accepts a company name or ticker symbol, retrieves current financial data from external providers, and applies a credit rating methodology defined in a PDF document stored in Box using an LLM to interpret and execute the methodology logic.
 
-The architecture follows a layered approach with clear separation between the web interface, business logic, data retrieval, LLM integration, and Box platform integration layers. Box serves as the central document management platform for storing the methodology PDF, generated rating reports, and historical documentation. This design enables the system to be flexible (supporting PDF-based methodology), maintainable (clear component boundaries), secure (leveraging Box's enterprise security), and extensible (supporting future structured methodology formats).
+The architecture follows a layered approach with clear separation between the web interface, business logic, data retrieval, LLM integration, and Box platform integration layers. Box serves as the central document management platform for storing the methodology PDF, generated rating reports, and historical documentation. The system leverages the self-hosted Box MCP (Model Context Protocol) server to interact with Box, providing a standardized interface for all Box operations and eliminating the need for direct SDK integration. This design enables the system to be flexible (supporting PDF-based methodology), maintainable (clear component boundaries with MCP abstraction), secure (leveraging Box's enterprise security and MCP's authentication handling), and extensible (supporting future structured methodology formats).
 
 ## Architecture
 
@@ -33,10 +33,11 @@ graph TB
     RatingEngine --> DataRetriever
     RatingEngine --> MethodologyLoader
     RatingEngine --> Storage
-    MethodologyLoader --> BoxClient
-    Storage --> BoxClient
+    MethodologyLoader --> BoxMCP[Box MCP Client]
+    Storage --> BoxMCP
     Storage --> DB[(Database)]
-    BoxClient --> BoxAPI[Box Platform API]
+    BoxMCP --> MCPServer[Box MCP Server]
+    MCPServer --> BoxAPI[Box Platform API]
     
     DataRetriever --> FinancialAPI[Financial Data Provider API]
 ```
@@ -181,53 +182,44 @@ interface MethodologyLoader {
 }
 ```
 
-### 8. Box Client Component
+### 8. Box MCP Client Component
 
 **Responsibilities:**
-- Authenticate with Box using custom application credentials (JWT or OAuth 2.0)
-- Download methodology PDF and structured files
-- Upload generated rating reports
-- Manage folder structure for organizing ratings by company
-- Handle file versioning and metadata
-- Search and retrieve historical rating documents
+- Connect to self-hosted Box MCP server
+- Use MCP tools to interact with Box (download files, upload files, manage folders)
+- Leverage MCP for methodology PDF retrieval
+- Use MCP for rating report uploads and folder management
+- Handle MCP tool responses and errors
+
+The Box MCP server provides standardized tools for Box operations, eliminating the need for direct Box SDK integration and authentication management. The MCP server handles all Box authentication and API interactions.
+
+**Key MCP Tools Used:**
+- `box_search`: Search for files and folders in Box
+- `box_get_file_info`: Get metadata about a specific file
+- `box_read_file`: Download and read file contents
+- `box_upload_file`: Upload new files to Box
+- `box_create_folder`: Create new folders
+- `box_update_file_metadata`: Add/update custom metadata on files
 
 **Key Interfaces:**
 ```typescript
-interface BoxClient {
-  authenticate(): Promise<void>
-  downloadFile(fileId: string): Promise<Buffer>
-  uploadFile(folderId: string, fileName: string, content: Buffer): Promise<BoxFile>
-  createFolder(parentFolderId: string, folderName: string): Promise<BoxFolder>
-  searchFiles(query: string, folderId?: string): Promise<BoxFile[]>
-  getFileMetadata(fileId: string): Promise<BoxFileMetadata>
-  updateFileMetadata(fileId: string, metadata: Record<string, any>): Promise<void>
-  getFileVersions(fileId: string): Promise<BoxFileVersion[]>
+interface BoxMCPClient {
+  // MCP connection management
+  connectToMCP(): Promise<void>
+  
+  // File operations via MCP tools
+  searchFiles(query: string, folderId?: string): Promise<MCPToolResult>
+  getFileInfo(fileId: string): Promise<MCPToolResult>
+  readFile(fileId: string): Promise<Buffer>
+  uploadFile(folderId: string, fileName: string, content: Buffer): Promise<MCPToolResult>
+  createFolder(parentFolderId: string, folderName: string): Promise<MCPToolResult>
+  updateFileMetadata(fileId: string, metadata: Record<string, any>): Promise<MCPToolResult>
 }
 
-interface BoxFile {
-  id: string
-  name: string
-  size: number
-  createdAt: Date
-  modifiedAt: Date
-  version: number
-}
-
-interface BoxFolder {
-  id: string
-  name: string
-  path: string
-}
-
-interface BoxFileMetadata {
-  fileId: string
-  customMetadata: Record<string, any>
-}
-
-interface BoxFileVersion {
-  id: string
-  versionNumber: number
-  createdAt: Date
+interface MCPToolResult {
+  success: boolean
+  data: any
+  error?: string
 }
 ```
 
@@ -432,11 +424,12 @@ The system implements comprehensive error handling across all layers:
 - Incomplete data: Identify and report missing fields to user
 - Stale data (>12 months): Display warning but allow rating generation
 
-### Box Platform Errors
-- Authentication failures: Log error and fail system initialization
+### Box MCP Server Errors
+- MCP connection failures: Retry connection with exponential backoff, fail initialization if unable to connect
+- MCP tool execution errors: Parse error responses from MCP tools and provide user-friendly messages
 - File not found: Return clear error message indicating methodology is missing
-- Upload failures: Retry up to 3 times, then log error and notify user
-- Network timeouts: Implement 30-second timeout with retry logic
+- Upload failures: Retry MCP tool call up to 3 times, then log error and notify user
+- Network timeouts: Implement 30-second timeout for MCP tool calls with retry logic
 
 ### LLM Service Errors
 - API rate limits: Implement exponential backoff and queue requests
@@ -521,7 +514,8 @@ Integration tests will use real Box sandbox environment and mock financial data 
 ### Backend
 - **Runtime**: Node.js 20+ with TypeScript
 - **Web Framework**: Express.js or Fastify
-- **Box SDK**: Box Node SDK (official)
+- **Box Integration**: Self-hosted Box MCP Server (https://developer.box.com/guides/box-mcp/self-hosted/)
+- **MCP Client**: @modelcontextprotocol/sdk for connecting to MCP server
 - **LLM Integration**: OpenAI SDK or Anthropic SDK
 - **Database**: PostgreSQL for metadata and historical ratings
 - **PDF Processing**: pdf-parse or pdfjs-dist
@@ -542,13 +536,14 @@ Integration tests will use real Box sandbox environment and mock financial data 
 
 ## Security Considerations
 
-1. **Box Authentication**: Use JWT authentication with private key stored securely, never in code
-2. **API Keys**: Store LLM and financial data provider API keys in secure vault
-3. **Data Privacy**: Ensure financial data is not logged or cached insecurely
-4. **Access Control**: Implement user authentication and authorization for web UI
-5. **Input Validation**: Sanitize all user inputs to prevent injection attacks
-6. **HTTPS**: All external API calls use HTTPS
-7. **Error Messages**: Sanitize error messages to avoid information disclosure
+1. **Box MCP Server**: Self-hosted MCP server handles Box authentication, keeping credentials isolated from application code
+2. **MCP Connection**: Secure connection to local MCP server (typically via stdio or local socket)
+3. **API Keys**: Store LLM and financial data provider API keys in secure vault
+4. **Data Privacy**: Ensure financial data is not logged or cached insecurely
+5. **Access Control**: Implement user authentication and authorization for web UI
+6. **Input Validation**: Sanitize all user inputs to prevent injection attacks
+7. **HTTPS**: All external API calls use HTTPS
+8. **Error Messages**: Sanitize error messages to avoid information disclosure
 
 ## Performance Considerations
 
@@ -567,12 +562,22 @@ graph TB
     LB --> App2[App Server 2]
     App1 --> DB[(PostgreSQL)]
     App2 --> DB
-    App1 --> BoxAPI[Box Platform API]
-    App2 --> BoxAPI
+    App1 --> MCP1[Box MCP Server 1]
+    App2 --> MCP2[Box MCP Server 2]
+    MCP1 --> BoxAPI[Box Platform API]
+    MCP2 --> BoxAPI
     App1 --> LLMAPI[LLM API]
     App2 --> LLMAPI
     App1 --> FinAPI[Financial Data API]
     App2 --> FinAPI
 ```
 
-The application will be deployed as stateless containers that can scale horizontally. The database serves as the single source of truth for metadata, while Box stores all documents and reports.
+The application will be deployed as stateless containers that can scale horizontally. Each app server instance runs with its own Box MCP server process (or connects to a shared MCP server). The database serves as the single source of truth for metadata, while Box stores all documents and reports.
+
+### Box MCP Server Setup
+
+The self-hosted Box MCP server will be configured following the official guide:
+- Installation: Follow https://developer.box.com/guides/box-mcp/self-hosted/
+- Authentication: Configure Box Custom App with JWT authentication
+- Configuration: Set up MCP server with appropriate Box folder access
+- Deployment: Run MCP server as a sidecar process or separate service accessible to app servers
