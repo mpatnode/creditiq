@@ -1,18 +1,19 @@
 # Implementation Plan
 
 - [ ] 1. Set up project structure and development environment
-  - Initialize Node.js TypeScript project with proper configuration
-  - Set up Express.js web server with basic routing
-  - Configure PostgreSQL database connection
-  - Set up environment variable management for API keys and configuration
+  - Initialize Python project with pyproject.toml or requirements.txt
+  - Set up Flask application with Flask-RESTX for API documentation
+  - Configure PostgreSQL database connection with SQLAlchemy
+  - Set up environment variable management using python-dotenv
   - Install and configure Box MCP server following https://developer.box.com/guides/box-mcp/self-hosted/
-  - Configure testing framework (Jest) and property-based testing library (fast-check)
+  - Configure testing framework (pytest) and property-based testing library (Hypothesis)
+  - Create project structure: app/, models/, services/, tests/
   - _Requirements: 8.1_
 
 - [ ] 2. Implement Box MCP Client integration
-  - Create BoxMCPClient class with MCP connection management
+  - Create BoxMCPClient class in services/box_mcp_client.py with MCP connection management
   - Implement MCP tool wrappers for box_search, box_read_file, box_upload_file, box_create_folder
-  - Add error handling and retry logic for MCP tool calls
+  - Add error handling and retry logic for MCP tool calls using tenacity library
   - _Requirements: 8.1, 8.2_
 
 - [ ]* 2.1 Write property test for Box MCP file operations
@@ -20,10 +21,10 @@
   - **Validates: Requirements 8.2**
 
 - [ ] 3. Implement Methodology Loader component
-  - Create MethodologyLoader class that uses BoxMCPClient
-  - Implement loadPDFFromBox method to retrieve methodology from Box
-  - Add PDF text extraction using pdf-parse library
-  - Implement in-memory caching for methodology content
+  - Create MethodologyLoader class in services/methodology_loader.py that uses BoxMCPClient
+  - Implement load_pdf_from_box method to retrieve methodology from Box
+  - Add PDF text extraction using PyPDF2 or pdfplumber library
+  - Implement in-memory caching for methodology content using functools.lru_cache
   - _Requirements: 3.1, 8.2_
 
 - [ ]* 3.1 Write unit tests for methodology loading and caching
@@ -33,9 +34,9 @@
   - _Requirements: 3.1, 8.2_
 
 - [ ] 4. Implement Financial Data Retriever component
-  - Create FinancialDataRetriever class with provider integration (e.g., Alpha Vantage or Financial Modeling Prep)
-  - Implement getCompanyData method to fetch financial statements
-  - Implement searchCompanies method for company lookup
+  - Create FinancialDataRetriever class in services/financial_data_retriever.py with provider integration (e.g., Alpha Vantage or Financial Modeling Prep)
+  - Implement get_company_data method to fetch financial statements using requests library
+  - Implement search_companies method for company lookup
   - Add data normalization logic to standardize provider responses
   - Implement data quality validation (completeness, age checks)
   - _Requirements: 1.1, 4.1, 4.2_
@@ -55,10 +56,10 @@
   - _Requirements: 1.1, 4.1, 4.2_
 
 - [ ] 5. Implement LLM Service component
-  - Create LLMService class with OpenAI or Anthropic SDK integration
-  - Implement applyMethodology method that constructs prompts with methodology and financial data
-  - Add structured output parsing to extract rating, score, metrics, and breakdown
-  - Implement retry logic with exponential backoff for rate limits
+  - Create LLMService class in services/llm_service.py with OpenAI or Anthropic SDK integration
+  - Implement apply_methodology method that constructs prompts with methodology and financial data
+  - Add structured output parsing to extract rating, score, metrics, and breakdown using Pydantic
+  - Implement retry logic with exponential backoff for rate limits using tenacity
   - Add response validation to ensure LLM output matches expected schema
   - _Requirements: 3.2, 3.3_
 
@@ -73,10 +74,10 @@
   - _Requirements: 3.2, 3.3_
 
 - [ ] 6. Implement Rating Engine component
-  - Create RatingEngine class that orchestrates the rating workflow
-  - Implement calculateRating method that coordinates data retrieval, methodology loading, and LLM invocation
-  - Add logic to prepare source documents (financial data snapshot, methodology snapshot)
-  - Implement rating result validation
+  - Create RatingEngine class in services/rating_engine.py that orchestrates the rating workflow
+  - Implement calculate_rating method that coordinates data retrieval, methodology loading, and LLM invocation
+  - Add logic to prepare source documents (financial data snapshot, methodology snapshot) as JSON and text files
+  - Implement rating result validation using Pydantic models
   - _Requirements: 1.2, 3.2_
 
 - [ ]* 6.1 Write property test for rating generation
@@ -92,12 +93,13 @@
   - **Validates: Requirements 2.1, 2.2, 2.3**
 
 - [ ] 7. Implement Rating Storage component with Box integration
-  - Create RatingStorage class with database and Box MCP integration
-  - Implement saveRating method to persist rating metadata to PostgreSQL
-  - Implement saveRatingPackageToBox method to upload rating report and source documents
-  - Create folder structure management (ensureCompanyFolder, ensureRatingFolder)
-  - Add metadata tagging for Box files
-  - Implement historical ratings retrieval from database
+  - Create RatingStorage class in services/rating_storage.py with SQLAlchemy and Box MCP integration
+  - Create SQLAlchemy models in models/rating.py for rating metadata
+  - Implement save_rating method to persist rating metadata to PostgreSQL
+  - Implement save_rating_package_to_box method to upload rating report and source documents
+  - Create folder structure management (ensure_company_folder, ensure_rating_folder)
+  - Add metadata tagging for Box files using MCP tools
+  - Implement historical ratings retrieval from database with SQLAlchemy queries
   - _Requirements: 6.1, 8.3, 8.4, 8.5_
 
 - [ ]* 7.1 Write property test for rating persistence
@@ -123,11 +125,13 @@
   - _Requirements: 6.1, 8.3, 8.4, 8.5_
 
 - [ ] 8. Implement API endpoints
+  - Create Flask blueprints in app/routes/ for API organization
   - Create POST /api/companies/search endpoint for company search
   - Create POST /api/ratings/generate endpoint for rating generation
-  - Create GET /api/ratings/history/:companyId endpoint for historical ratings
+  - Create GET /api/ratings/history/<company_id> endpoint for historical ratings
   - Create GET /api/methodology endpoint for methodology information
-  - Add request validation and error handling middleware
+  - Add request validation using Flask-RESTX models or marshmallow
+  - Add error handling middleware with custom error handlers
   - _Requirements: 1.1, 1.2, 2.4, 6.2_
 
 - [ ]* 8.1 Write property test for company search

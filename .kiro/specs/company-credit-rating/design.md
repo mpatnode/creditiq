@@ -85,23 +85,32 @@ graph TB
 - Prepare source documents for archival (financial data snapshot, methodology version used)
 
 **Key Interfaces:**
-```typescript
-interface RatingEngine {
-  calculateRating(company: Company): Promise<RatingResult>
-  validateRatingOutput(output: LLMResponse): RatingResult
-}
+```python
+from datetime import datetime
+from typing import List
 
-interface RatingResult {
-  companyId: string
-  rating: CreditRating
-  score: number
-  metrics: FinancialMetrics
-  breakdown: MetricBreakdown[]
-  timestamp: Date
-  confidence: number
-  sourceDocuments: SourceDocument[]
-  methodologyVersion: string
-}
+class RatingEngine:
+    """Orchestrates the credit rating calculation workflow."""
+    
+    def calculate_rating(self, company: Company) -> RatingResult:
+        """Calculate credit rating for a company."""
+        pass
+    
+    def validate_rating_output(self, output: LLMResponse) -> RatingResult:
+        """Validate and parse LLM output into RatingResult."""
+        pass
+
+@dataclass
+class RatingResult:
+    company_id: str
+    rating: CreditRating
+    score: float
+    metrics: FinancialMetrics
+    breakdown: List[MetricBreakdown]
+    timestamp: datetime
+    confidence: float
+    source_documents: List[SourceDocument]
+    methodology_version: str
 ```
 
 ### 4. LLM Service Component
@@ -114,26 +123,35 @@ interface RatingResult {
 - Optionally cache methodology interpretations
 
 **Key Interfaces:**
-```typescript
-interface LLMService {
-  applyMethodology(
-    methodology: string,
-    financialData: FinancialData,
-    options?: LLMOptions
-  ): Promise<LLMResponse>
-  
-  convertMethodologyToStructured(
-    methodologyPDF: string
-  ): Promise<StructuredMethodology>
-}
+```python
+from typing import Optional
 
-interface LLMResponse {
-  rating: string
-  score: number
-  reasoning: string
-  metrics: Record<string, number>
-  breakdown: MetricBreakdown[]
-}
+class LLMService:
+    """Interface with LLM API for methodology application."""
+    
+    def apply_methodology(
+        self,
+        methodology: str,
+        financial_data: FinancialData,
+        options: Optional[Dict[str, Any]] = None
+    ) -> LLMResponse:
+        """Apply methodology to financial data using LLM."""
+        pass
+    
+    def convert_methodology_to_structured(
+        self,
+        methodology_pdf: str
+    ) -> StructuredMethodology:
+        """Convert PDF methodology to structured format using LLM."""
+        pass
+
+@dataclass
+class LLMResponse:
+    rating: str
+    score: float
+    reasoning: str
+    metrics: Dict[str, float]
+    breakdown: List[MetricBreakdown]
 ```
 
 ### 5. Financial Data Retriever Component
@@ -145,25 +163,36 @@ interface LLMResponse {
 - Calculate derived financial metrics
 
 **Key Interfaces:**
-```typescript
-interface FinancialDataRetriever {
-  getCompanyData(identifier: string): Promise<FinancialData>
-  searchCompanies(query: string): Promise<Company[]>
-  validateDataQuality(data: FinancialData): DataQualityReport
-}
+```python
+class FinancialDataRetriever:
+    """Retrieve and normalize financial data from external providers."""
+    
+    def get_company_data(self, identifier: str) -> FinancialData:
+        """Retrieve financial data for a company."""
+        pass
+    
+    def search_companies(self, query: str) -> List[Company]:
+        """Search for companies by name or ticker."""
+        pass
+    
+    def validate_data_quality(self, data: FinancialData) -> DataQualityReport:
+        """Validate completeness and freshness of financial data."""
+        pass
 
-interface FinancialData {
-  companyId: string
-  companyName: string
-  ticker: string
-  financialStatements: {
-    balanceSheet: BalanceSheet
-    incomeStatement: IncomeStatement
-    cashFlowStatement: CashFlowStatement
-  }
-  marketData: MarketData
-  dataDate: Date
-}
+@dataclass
+class FinancialStatements:
+    balance_sheet: Dict[str, Any]
+    income_statement: Dict[str, Any]
+    cash_flow_statement: Dict[str, Any]
+
+@dataclass
+class FinancialData:
+    company_id: str
+    company_name: str
+    ticker: str
+    financial_statements: FinancialStatements
+    market_data: Dict[str, Any]
+    data_date: datetime
 ```
 
 ### 6. Methodology Loader Component
@@ -176,13 +205,25 @@ interface FinancialData {
 - Handle Box file versioning
 
 **Key Interfaces:**
-```typescript
-interface MethodologyLoader {
-  loadPDFFromBox(fileId: string): Promise<string>
-  loadStructured(fileId: string): Promise<StructuredMethodology | null>
-  getMethodologyContent(): Promise<string>
-  getLatestMethodologyVersion(): Promise<BoxFile>
-}
+```python
+class MethodologyLoader:
+    """Load and cache methodology from Box."""
+    
+    def load_pdf_from_box(self, file_id: str) -> str:
+        """Load methodology PDF from Box and extract text."""
+        pass
+    
+    def load_structured(self, file_id: str) -> Optional[StructuredMethodology]:
+        """Load structured methodology format from Box."""
+        pass
+    
+    def get_methodology_content(self) -> str:
+        """Get cached methodology content."""
+        pass
+    
+    def get_latest_methodology_version(self) -> Dict[str, Any]:
+        """Get latest methodology file version from Box."""
+        pass
 ```
 
 ### 8. Box MCP Client Component
@@ -205,25 +246,43 @@ The Box MCP server provides standardized tools for Box operations, eliminating t
 - `box_update_file_metadata`: Add/update custom metadata on files
 
 **Key Interfaces:**
-```typescript
-interface BoxMCPClient {
-  // MCP connection management
-  connectToMCP(): Promise<void>
-  
-  // File operations via MCP tools
-  searchFiles(query: string, folderId?: string): Promise<MCPToolResult>
-  getFileInfo(fileId: string): Promise<MCPToolResult>
-  readFile(fileId: string): Promise<Buffer>
-  uploadFile(folderId: string, fileName: string, content: Buffer): Promise<MCPToolResult>
-  createFolder(parentFolderId: string, folderName: string): Promise<MCPToolResult>
-  updateFileMetadata(fileId: string, metadata: Record<string, any>): Promise<MCPToolResult>
-}
+```python
+class BoxMCPClient:
+    """Client for interacting with Box via MCP server."""
+    
+    def connect_to_mcp(self) -> None:
+        """Establish connection to MCP server."""
+        pass
+    
+    def search_files(self, query: str, folder_id: Optional[str] = None) -> MCPToolResult:
+        """Search for files in Box."""
+        pass
+    
+    def get_file_info(self, file_id: str) -> MCPToolResult:
+        """Get metadata about a specific file."""
+        pass
+    
+    def read_file(self, file_id: str) -> bytes:
+        """Download and read file contents."""
+        pass
+    
+    def upload_file(self, folder_id: str, file_name: str, content: bytes) -> MCPToolResult:
+        """Upload a new file to Box."""
+        pass
+    
+    def create_folder(self, parent_folder_id: str, folder_name: str) -> MCPToolResult:
+        """Create a new folder in Box."""
+        pass
+    
+    def update_file_metadata(self, file_id: str, metadata: Dict[str, Any]) -> MCPToolResult:
+        """Update custom metadata on a file."""
+        pass
 
-interface MCPToolResult {
-  success: boolean
-  data: any
-  error?: string
-}
+@dataclass
+class MCPToolResult:
+    success: bool
+    data: Any
+    error: Optional[str] = None
 ```
 
 ### 7. Rating Storage Component
@@ -238,134 +297,177 @@ interface MCPToolResult {
 - Organize Box folder structure by company and rating date
 
 **Key Interfaces:**
-```typescript
-interface RatingStorage {
-  saveRating(rating: RatingResult): Promise<void>
-  saveRatingPackageToBox(
-    rating: RatingResult, 
-    companyId: string,
-    sourceDocuments: SourceDocument[]
-  ): Promise<RatingPackageInfo>
-  getHistoricalRatings(companyId: string): Promise<RatingResult[]>
-  getLatestRating(companyId: string): Promise<RatingResult | null>
-  getRatingReportFromBox(boxFileId: string): Promise<Buffer>
-  getSourceDocumentFromBox(boxFileId: string): Promise<Buffer>
-  ensureCompanyFolder(companyId: string): Promise<string>
-  ensureRatingFolder(companyId: string, ratingDate: Date): Promise<string>
-}
+```python
+class RatingStorage:
+    """Persist ratings to database and Box."""
+    
+    def save_rating(self, rating: RatingResult) -> None:
+        """Save rating metadata to database."""
+        pass
+    
+    def save_rating_package_to_box(
+        self,
+        rating: RatingResult,
+        company_id: str,
+        source_documents: List[SourceDocument]
+    ) -> RatingPackageInfo:
+        """Upload rating report and source documents to Box."""
+        pass
+    
+    def get_historical_ratings(self, company_id: str) -> List[RatingResult]:
+        """Retrieve historical ratings from database."""
+        pass
+    
+    def get_latest_rating(self, company_id: str) -> Optional[RatingResult]:
+        """Get most recent rating for a company."""
+        pass
+    
+    def get_rating_report_from_box(self, box_file_id: str) -> bytes:
+        """Download rating report from Box."""
+        pass
+    
+    def get_source_document_from_box(self, box_file_id: str) -> bytes:
+        """Download source document from Box."""
+        pass
+    
+    def ensure_company_folder(self, company_id: str) -> str:
+        """Create company folder in Box if it doesn't exist."""
+        pass
+    
+    def ensure_rating_folder(self, company_id: str, rating_date: datetime) -> str:
+        """Create rating-specific folder in Box."""
+        pass
 
-interface SourceDocument {
-  type: 'financial_statements' | 'market_data' | 'methodology_snapshot'
-  content: Buffer
-  fileName: string
-  metadata: Record<string, any>
-}
+@dataclass
+class SourceDocument:
+    type: str  # 'financial_statements', 'market_data', or 'methodology_snapshot'
+    content: bytes
+    file_name: str
+    metadata: Dict[str, Any]
 
-interface RatingPackageInfo {
-  ratingReportFileId: string
-  sourceDocumentFileIds: string[]
-  folderPath: string
-}
+@dataclass
+class RatingPackageInfo:
+    rating_report_file_id: str
+    source_document_file_ids: List[str]
+    folder_path: str
 ```
 
 ## Data Models
 
 ### Company
-```typescript
-interface Company {
-  id: string
-  name: string
-  ticker: string
-  exchange: string
-  sector: string
-  industry: string
-}
+```python
+from dataclasses import dataclass
+from enum import Enum
+
+@dataclass
+class Company:
+    id: str
+    name: str
+    ticker: str
+    exchange: str
+    sector: str
+    industry: str
 ```
 
 ### CreditRating
-```typescript
-type CreditRating = 
-  | 'AAA' | 'AA+' | 'AA' | 'AA-'
-  | 'A+' | 'A' | 'A-'
-  | 'BBB+' | 'BBB' | 'BBB-'
-  | 'BB+' | 'BB' | 'BB-'
-  | 'B+' | 'B' | 'B-'
-  | 'CCC+' | 'CCC' | 'CCC-'
-  | 'CC' | 'C' | 'D'
+```python
+class CreditRating(Enum):
+    AAA = "AAA"
+    AA_PLUS = "AA+"
+    AA = "AA"
+    AA_MINUS = "AA-"
+    A_PLUS = "A+"
+    A = "A"
+    A_MINUS = "A-"
+    BBB_PLUS = "BBB+"
+    BBB = "BBB"
+    BBB_MINUS = "BBB-"
+    BB_PLUS = "BB+"
+    BB = "BB"
+    BB_MINUS = "BB-"
+    B_PLUS = "B+"
+    B = "B"
+    B_MINUS = "B-"
+    CCC_PLUS = "CCC+"
+    CCC = "CCC"
+    CCC_MINUS = "CCC-"
+    CC = "CC"
+    C = "C"
+    D = "D"
 ```
 
 ### FinancialMetrics
-```typescript
-interface FinancialMetrics {
-  // Leverage ratios
-  debtToEquity: number
-  debtToAssets: number
-  interestCoverage: number
-  
-  // Profitability ratios
-  returnOnEquity: number
-  returnOnAssets: number
-  netProfitMargin: number
-  operatingMargin: number
-  
-  // Liquidity ratios
-  currentRatio: number
-  quickRatio: number
-  cashRatio: number
-  
-  // Efficiency ratios
-  assetTurnover: number
-  inventoryTurnover: number
-  
-  // Market metrics
-  marketCap: number
-  priceToEarnings: number
-  priceToBook: number
-}
+```python
+@dataclass
+class FinancialMetrics:
+    # Leverage ratios
+    debt_to_equity: float
+    debt_to_assets: float
+    interest_coverage: float
+    
+    # Profitability ratios
+    return_on_equity: float
+    return_on_assets: float
+    net_profit_margin: float
+    operating_margin: float
+    
+    # Liquidity ratios
+    current_ratio: float
+    quick_ratio: float
+    cash_ratio: float
+    
+    # Efficiency ratios
+    asset_turnover: float
+    inventory_turnover: float
+    
+    # Market metrics
+    market_cap: float
+    price_to_earnings: float
+    price_to_book: float
 ```
 
 ### MetricBreakdown
-```typescript
-interface MetricBreakdown {
-  category: string
-  weight: number
-  score: number
-  metrics: Record<string, number>
-  reasoning: string
-}
+```python
+@dataclass
+class MetricBreakdown:
+    category: str
+    weight: float
+    score: float
+    metrics: Dict[str, float]
+    reasoning: str
 ```
 
 ### StructuredMethodology
-```typescript
-interface StructuredMethodology {
-  version: string
-  categories: MethodologyCategory[]
-  ratingThresholds: RatingThreshold[]
-}
+```python
+@dataclass
+class ScoringRule:
+    condition: str
+    score: float
 
-interface MethodologyCategory {
-  name: string
-  weight: number
-  metrics: MetricDefinition[]
-}
+@dataclass
+class MetricDefinition:
+    name: str
+    formula: str
+    weight: float
+    scoring_rules: List[ScoringRule]
 
-interface MetricDefinition {
-  name: string
-  formula: string
-  weight: number
-  scoringRules: ScoringRule[]
-}
+@dataclass
+class MethodologyCategory:
+    name: str
+    weight: float
+    metrics: List[MetricDefinition]
 
-interface ScoringRule {
-  condition: string
-  score: number
-}
+@dataclass
+class RatingThreshold:
+    rating: CreditRating
+    min_score: float
+    max_score: float
 
-interface RatingThreshold {
-  rating: CreditRating
-  minScore: number
-  maxScore: number
-}
+@dataclass
+class StructuredMethodology:
+    version: str
+    categories: List[MethodologyCategory]
+    rating_thresholds: List[RatingThreshold]
 ```
 
 ## Correctness Properties
@@ -479,16 +581,16 @@ Unit tests will verify specific examples, integration points, and edge cases:
 - **Error Scenarios**: Network failures, authentication errors, invalid inputs
 - **Specific Examples**: Known company data producing expected ratings
 
-Unit tests will use Jest (for TypeScript/Node.js) and will mock external dependencies (Box API, Financial Data Provider, LLM API) to ensure fast, deterministic test execution.
+Unit tests will use pytest and will mock external dependencies (Box MCP, Financial Data Provider, LLM API) to ensure fast, deterministic test execution.
 
 ### Property-Based Testing
 
-Property-based tests will verify universal properties that should hold across all inputs. We will use **fast-check** as the property-based testing library for TypeScript/Node.js.
+Property-based tests will verify universal properties that should hold across all inputs. We will use **Hypothesis** as the property-based testing library for Python.
 
 **Configuration:**
-- Each property test will run a minimum of 100 iterations
-- Each test will be tagged with a comment referencing the correctness property from this design document
-- Tag format: `// Feature: company-credit-rating, Property {number}: {property_text}`
+- Each property test will run a minimum of 100 iterations (configured via Hypothesis settings)
+- Each test will be tagged with a docstring referencing the correctness property from this design document
+- Tag format: `"""Feature: company-credit-rating, Property {number}: {property_text}"""`
 
 **Property Test Coverage:**
 
@@ -535,20 +637,20 @@ Integration tests will use real Box sandbox environment and mock financial data 
 ## Technology Stack
 
 ### Backend
-- **Runtime**: Node.js 20+ with TypeScript
-- **Web Framework**: Express.js or Fastify
+- **Runtime**: Python 3.11+
+- **Web Framework**: Flask with Flask-RESTX for API documentation
 - **Box Integration**: Self-hosted Box MCP Server (https://developer.box.com/guides/box-mcp/self-hosted/)
-- **MCP Client**: @modelcontextprotocol/sdk for connecting to MCP server
-- **LLM Integration**: OpenAI SDK or Anthropic SDK
-- **Database**: PostgreSQL for metadata and historical ratings
-- **PDF Processing**: pdf-parse or pdfjs-dist
-- **Testing**: Jest + fast-check
+- **MCP Client**: mcp Python package for connecting to MCP server
+- **LLM Integration**: OpenAI Python SDK or Anthropic Python SDK
+- **Database**: PostgreSQL with SQLAlchemy ORM
+- **PDF Processing**: PyPDF2 or pdfplumber
+- **Testing**: pytest + Hypothesis (property-based testing)
 
 ### Frontend
-- **Framework**: React with TypeScript
-- **UI Library**: Material-UI or Tailwind CSS
-- **State Management**: React Query for server state
-- **Charts**: Recharts or Chart.js for visualizing metrics
+- **Framework**: React with TypeScript (or Flask templates with Jinja2 for simpler approach)
+- **UI Library**: Bootstrap or Tailwind CSS
+- **State Management**: React Query for server state (if using React)
+- **Charts**: Chart.js or Plotly for visualizing metrics
 
 ### Infrastructure
 - **Hosting**: Cloud platform (AWS, GCP, or Azure)
