@@ -240,7 +240,7 @@ class BoxMCPClient:
         """
         arguments = {"query": query}
         if folder_id:
-            arguments["ancestor_folder_ids"] = folder_id
+            arguments["ancestor_folder_ids"] = [folder_id]
         
         return await self._call_tool("box_search_tool", arguments)
 

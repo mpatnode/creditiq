@@ -109,6 +109,9 @@ async def debug_mcp_protocol():
     print("\n" + "="*70)
 
 
+import pytest
+
+@pytest.mark.asyncio
 async def test_http_post():
     """Test if MCP server expects POST requests instead of SSE."""
     url = os.getenv("BOX_MCP_SERVER_URL", "http://localhost:8005/mcp")

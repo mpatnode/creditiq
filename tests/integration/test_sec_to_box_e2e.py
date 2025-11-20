@@ -232,16 +232,37 @@ class TestSECToBoxE2E:
             
             # Extract folder ID
             import json
+            import re
             folder_data = folder_result.data
+            batch_folder_id = None
+            
             if isinstance(folder_data, list):
                 for item in folder_data:
                     if hasattr(item, 'text'):
-                        folder_data = json.loads(item.text)
+                        text = item.text
+                        try:
+                            folder_data = json.loads(text)
+                            batch_folder_id = folder_data.get('folder', {}).get('id') or folder_data.get('id')
+                        except json.JSONDecodeError:
+                            # Parse plain text response
+                            match = re.search(r'Folder ID:\s*(\d+)', text)
+                            if match:
+                                batch_folder_id = match.group(1)
                         break
             elif isinstance(folder_data, str):
-                folder_data = json.loads(folder_data)
+                try:
+                    folder_data = json.loads(folder_data)
+                    batch_folder_id = folder_data.get('folder', {}).get('id') or folder_data.get('id')
+                except json.JSONDecodeError:
+                    match = re.search(r'Folder ID:\s*(\d+)', folder_data)
+                    if match:
+                        batch_folder_id = match.group(1)
+            elif isinstance(folder_data, dict):
+                batch_folder_id = folder_data.get('folder', {}).get('id') or folder_data.get('id')
             
-            batch_folder_id = folder_data.get('id')
+            if not batch_folder_id:
+                pytest.fail(f"Failed to extract folder ID from result: {folder_result.data}")
+            
             print(f"\n📁 Created batch folder: {batch_folder_name} (ID: {batch_folder_id})")
             
             uploaded_files = []
@@ -263,15 +284,36 @@ class TestSECToBoxE2E:
                     
                     if upload_result.success:
                         file_data = upload_result.data
+                        file_id = None
+                        
                         if isinstance(file_data, list):
                             for item in file_data:
                                 if hasattr(item, 'text'):
-                                    file_data = json.loads(item.text)
+                                    text = item.text
+                                    try:
+                                        file_data = json.loads(text)
+                                        file_id = file_data.get('id')
+                                    except json.JSONDecodeError:
+                                        import re
+                                        match = re.search(r'File ID:\s*(\d+)', text)
+                                        if match:
+                                            file_id = match.group(1)
                                     break
                         elif isinstance(file_data, str):
-                            file_data = json.loads(file_data)
+                            try:
+                                file_data = json.loads(file_data)
+                                file_id = file_data.get('id')
+                            except json.JSONDecodeError:
+                                import re
+                                match = re.search(r'File ID:\s*(\d+)', file_data)
+                                if match:
+                                    file_id = match.group(1)
+                        elif isinstance(file_data, dict):
+                            file_id = file_data.get('id')
                         
-                        file_id = file_data.get('id')
+                        if not file_id:
+                            print(f"  ✗ Could not extract file ID from: {upload_result.data}")
+                            continue
                         uploaded_files.append((company_name, filename, file_id))
                         print(f"  ✓ Uploaded to Box (ID: {file_id})")
                         

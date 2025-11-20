@@ -134,7 +134,7 @@ class TestBoxMCPClient:
         assert result.success
         client._session.call_tool.assert_called_once()
         call_args = client._session.call_tool.call_args
-        assert call_args[0][0] == "box_search"
+        assert call_args[0][0] == "box_search_tool"
         assert "ancestor_folder_ids" in call_args[0][1]
 
     @pytest.mark.asyncio
@@ -155,7 +155,7 @@ class TestBoxMCPClient:
         assert result.success
         client._session.call_tool.assert_called_once()
         call_args = client._session.call_tool.call_args
-        assert call_args[0][0] == "box_upload_file"
+        assert call_args[0][0] == "box_upload_file_from_content_tool"
         assert "content" in call_args[0][1]
 
     @pytest.mark.asyncio
@@ -175,7 +175,7 @@ class TestBoxMCPClient:
         assert result.success
         client._session.call_tool.assert_called_once()
         call_args = client._session.call_tool.call_args
-        assert call_args[0][0] == "box_create_folder"
+        assert call_args[0][0] == "box_folder_create_tool"
         assert call_args[0][1]["parent_folder_id"] == "parent123"
         assert call_args[0][1]["name"] == "new_folder"
 

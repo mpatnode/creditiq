@@ -159,7 +159,7 @@
   - Test error handling
   - _Requirements: 1.1, 1.2, 2.4, 6.2_
 
-- [-] 9. Checkpoint - Ensure all tests pass
+- [x] 9. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 10. Implement error handling and logging

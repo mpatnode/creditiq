@@ -68,12 +68,12 @@ class TestBoxMCPE2E:
         """Test that the methodology folder exists and is accessible."""
         async with box_client:
             try:
-                # Try to get folder info
-                result = await box_client.get_file_info(methodology_folder_id)
+                # Try to list folder contents to verify it exists
+                result = await box_client.search_files("*", folder_id=methodology_folder_id)
                 
                 if result.success:
                     print(f"\n✓ Methodology folder found: {methodology_folder_id}")
-                    print(f"  Folder data: {result.data}")
+                    print(f"  Folder accessible with {len(result.data) if isinstance(result.data, list) else 'unknown'} items")
                 else:
                     pytest.fail(
                         f"Methodology folder {methodology_folder_id} not accessible: {result.error}"
@@ -86,12 +86,12 @@ class TestBoxMCPE2E:
         """Test that the ratings folder exists and is accessible."""
         async with box_client:
             try:
-                # Try to get folder info
-                result = await box_client.get_file_info(ratings_folder_id)
+                # Try to list folder contents to verify it exists
+                result = await box_client.search_files("*", folder_id=ratings_folder_id)
                 
                 if result.success:
                     print(f"\n✓ Ratings folder found: {ratings_folder_id}")
-                    print(f"  Folder data: {result.data}")
+                    print(f"  Folder accessible with {len(result.data) if isinstance(result.data, list) else 'unknown'} items")
                 else:
                     pytest.fail(
                         f"Ratings folder {ratings_folder_id} not accessible: {result.error}"
