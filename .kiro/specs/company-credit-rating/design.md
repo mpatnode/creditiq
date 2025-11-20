@@ -82,6 +82,7 @@ graph TB
 - Invoke LLM to apply methodology
 - Parse and validate LLM output
 - Store rating results
+- Prepare source documents for archival (financial data snapshot, methodology version used)
 
 **Key Interfaces:**
 ```typescript
@@ -98,6 +99,8 @@ interface RatingResult {
   breakdown: MetricBreakdown[]
   timestamp: Date
   confidence: number
+  sourceDocuments: SourceDocument[]
+  methodologyVersion: string
 }
 ```
 
@@ -228,20 +231,40 @@ interface MCPToolResult {
 **Responsibilities:**
 - Persist generated ratings to database (metadata and quick access)
 - Upload detailed rating reports to Box
+- Upload source documents (financial statements, data snapshots) to Box for traceability
 - Query historical ratings from database
-- Retrieve full rating reports from Box when needed
+- Retrieve full rating reports and source documents from Box when needed
 - Manage data retention policies
-- Organize Box folder structure by company
+- Organize Box folder structure by company and rating date
 
 **Key Interfaces:**
 ```typescript
 interface RatingStorage {
   saveRating(rating: RatingResult): Promise<void>
-  saveRatingReportToBox(rating: RatingResult, companyId: string): Promise<string>
+  saveRatingPackageToBox(
+    rating: RatingResult, 
+    companyId: string,
+    sourceDocuments: SourceDocument[]
+  ): Promise<RatingPackageInfo>
   getHistoricalRatings(companyId: string): Promise<RatingResult[]>
   getLatestRating(companyId: string): Promise<RatingResult | null>
   getRatingReportFromBox(boxFileId: string): Promise<Buffer>
+  getSourceDocumentFromBox(boxFileId: string): Promise<Buffer>
   ensureCompanyFolder(companyId: string): Promise<string>
+  ensureRatingFolder(companyId: string, ratingDate: Date): Promise<string>
+}
+
+interface SourceDocument {
+  type: 'financial_statements' | 'market_data' | 'methodology_snapshot'
+  content: Buffer
+  fileName: string
+  metadata: Record<string, any>
+}
+
+interface RatingPackageInfo {
+  ratingReportFileId: string
+  sourceDocumentFileIds: string[]
+  folderPath: string
 }
 ```
 
@@ -406,8 +429,8 @@ interface RatingThreshold {
 *For any* rating calculation, the methodology content should be retrieved from Box, not from local filesystem.
 **Validates: Requirements 8.2**
 
-### Property 15: Rating report uploaded to Box with metadata
-*For any* generated credit rating, a detailed report should be uploaded to Box in a company-specific folder with metadata including company identifier, rating, and timestamp.
+### Property 15: Rating report and source documents uploaded to Box with metadata
+*For any* generated credit rating, a detailed report and all source documents (financial statements, data snapshots) should be uploaded to Box in a company-specific folder with metadata including company identifier, rating, and timestamp.
 **Validates: Requirements 8.3, 8.4, 8.5**
 
 ### Property 16: Error messages sanitized
@@ -581,3 +604,35 @@ The self-hosted Box MCP server will be configured following the official guide:
 - Authentication: Configure Box Custom App with JWT authentication
 - Configuration: Set up MCP server with appropriate Box folder access
 - Deployment: Run MCP server as a sidecar process or separate service accessible to app servers
+
+### Box Folder Structure
+
+The system organizes files in Box with the following structure:
+
+```
+/Credit Ratings/
+  /Methodology/
+    methodology-v1.0.pdf
+    methodology-v1.1.pdf
+  /Companies/
+    /AAPL - Apple Inc/
+      /2024-01-15_Rating_AAA/
+        rating-report.pdf
+        financial-statements.json
+        market-data.json
+        methodology-snapshot.txt
+      /2024-06-20_Rating_AA+/
+        rating-report.pdf
+        financial-statements.json
+        market-data.json
+        methodology-snapshot.txt
+    /MSFT - Microsoft Corp/
+      /2024-02-10_Rating_AAA/
+        ...
+```
+
+Each rating package includes:
+- **rating-report.pdf**: Human-readable rating report with analysis
+- **financial-statements.json**: Complete financial data used for the rating
+- **market-data.json**: Market metrics at time of rating
+- **methodology-snapshot.txt**: Copy of methodology content used for this rating

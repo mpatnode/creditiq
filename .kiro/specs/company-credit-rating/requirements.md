@@ -108,9 +108,10 @@ This document specifies the requirements for a web application that generates cr
 
 1. WHEN the system initializes, THE Credit Rating System SHALL authenticate with Box using the Box Custom Application credentials
 2. WHEN loading the methodology, THE Credit Rating System SHALL retrieve the Methodology PDF from Box
-3. WHEN a credit rating is generated, THE Credit Rating System SHALL upload a detailed rating report to Box in the appropriate company folder
-4. WHEN uploading rating reports, THE Credit Rating System SHALL create company-specific folders in Box if they do not exist
+3. WHEN a credit rating is generated, THE Credit Rating System SHALL upload a detailed rating report and all source documents to Box in the appropriate company folder
+4. WHEN uploading rating reports, THE Credit Rating System SHALL create company-specific folders and rating-date subfolders in Box if they do not exist
 5. WHEN storing files in Box, THE Credit Rating System SHALL add metadata including company identifier, rating, and timestamp
+6. WHEN storing rating packages in Box, THE Credit Rating System SHALL include the financial statements snapshot, market data snapshot, and methodology version used as source documents
 6. WHEN the Methodology PDF is updated in Box, THE Credit Rating System SHALL detect and use the latest version
 
 ### Requirement 9
