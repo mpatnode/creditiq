@@ -143,7 +143,7 @@
   - **Validates: Requirements 1.4**
 
 - [ ]* 8.3 Write unit tests for API endpoints
-  - Test request validation
+  - Test request validation using Flask test client
   - Test response formatting
   - Test error handling
   - _Requirements: 1.1, 1.2, 2.4, 6.2_
@@ -155,9 +155,10 @@
   - Add comprehensive error handling for Financial Data Provider failures
   - Add error handling for Box MCP connection and tool failures
   - Add error handling for LLM API failures
-  - Implement retry logic with exponential backoff for network errors
-  - Set up Winston or Pino logging with appropriate log levels
+  - Implement retry logic with exponential backoff for network errors using tenacity
+  - Set up Python logging with appropriate log levels and handlers
   - Implement error message sanitization for user-facing errors
+  - Create custom exception classes in app/exceptions.py
   - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5_
 
 - [ ]* 10.1 Write property test for error message sanitization
