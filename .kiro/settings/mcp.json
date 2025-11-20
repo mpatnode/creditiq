@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "box": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-box",
+        "/Users/mikep/Downloads/1371458327_9cgb17hi_config.json"
+      ],
+      "env": {},
+      "disabled": false,
+      "autoApprove": []
+    }
+  }
+}

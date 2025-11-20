@@ -20,7 +20,7 @@
   - **Property 14: Methodology loaded from Box**
   - **Validates: Requirements 8.2**
 
-- [-] 3. Implement Methodology Loader component
+- [x] 3. Implement Methodology Loader component
   - Create MethodologyLoader class in services/methodology_loader.py that uses BoxMCPClient
   - Implement load_pdf_from_box method to retrieve methodology from Box
   - Add PDF text extraction using PyPDF2 or pdfplumber library
@@ -55,29 +55,40 @@
   - Test error handling for API failures
   - _Requirements: 1.1, 4.1, 4.2_
 
-- [ ] 5. Implement LLM Service component
-  - Create LLMService class in services/llm_service.py with OpenAI or Anthropic SDK integration
-  - Implement apply_methodology method that constructs prompts with methodology and financial data
+- [ ] 5. Implement Box AI Service component
+  - Create BoxAIService class in services/box_ai_service.py that uses BoxMCPClient
+  - Implement apply_methodology method that:
+    - Uploads financial data as a temporary document to Box
+    - Uses box_ai_ask to query methodology PDF and financial data document together
+    - Constructs prompts asking Box AI to apply methodology and generate rating
   - Add structured output parsing to extract rating, score, metrics, and breakdown using Pydantic
-  - Implement retry logic with exponential backoff for rate limits using tenacity
-  - Add response validation to ensure LLM output matches expected schema
+  - Implement retry logic with exponential backoff for Box AI rate limits using tenacity
+  - Add response validation to ensure Box AI output matches expected schema
+  - Implement ask_box_ai wrapper method for general Box AI queries
+  - Implement extract_structured_data method using box_ai_extract tool
   - _Requirements: 3.2, 3.3_
 
-- [ ]* 5.1 Write property test for LLM context completeness
-  - **Property 5: LLM receives complete context**
+- [ ]* 5.1 Write property test for Box AI context completeness
+  - **Property 5: Box AI receives complete context**
   - **Validates: Requirements 3.3**
 
-- [ ]* 5.2 Write unit tests for LLM service
-  - Test prompt construction
+- [ ]* 5.2 Write unit tests for Box AI service
+  - Test prompt construction for box_ai_ask
   - Test response parsing
   - Test error handling and retries
+  - Test financial data document upload
   - _Requirements: 3.2, 3.3_
 
 - [ ] 6. Implement Rating Engine component
   - Create RatingEngine class in services/rating_engine.py that orchestrates the rating workflow
-  - Implement calculate_rating method that coordinates data retrieval, methodology loading, and LLM invocation
-  - Add logic to prepare source documents (financial data snapshot, methodology snapshot) as JSON and text files
+  - Implement calculate_rating method that coordinates:
+    - Financial data retrieval via FinancialDataRetriever
+    - Financial data document preparation (convert to JSON/text format)
+    - Upload financial data document to Box temporary folder
+    - Box AI invocation via BoxAIService with methodology file ID and financial data file ID
+  - Add logic to prepare source documents (financial data snapshot, methodology snapshot) for archival
   - Implement rating result validation using Pydantic models
+  - Add cleanup logic to remove temporary financial data documents after rating generation
   - _Requirements: 1.2, 3.2_
 
 - [ ]* 6.1 Write property test for rating generation
@@ -188,10 +199,11 @@
   - _Requirements: 1.3, 2.1, 6.3_
 
 - [ ] 12. Implement optional structured methodology conversion tool
-  - Create convert_methodology_to_structured method in LLMService
-  - Implement CLI tool using Click or argparse to convert PDF to structured JSON format
+  - Create convert_methodology_to_structured method in BoxAIService that uses box_ai_extract
+  - Implement CLI tool using Click or argparse to convert methodology PDF to structured JSON format
+  - Use Box AI Extract to pull out methodology rules, formulas, and thresholds
   - Add validation for structured methodology format using Pydantic
-  - Implement fallback logic to use PDF if structured format is invalid
+  - Implement fallback logic to use box_ai_ask with PDF if structured format is invalid
   - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5_
 
 - [ ]* 12.1 Write property test for structured methodology validation

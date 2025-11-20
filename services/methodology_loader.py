@@ -5,7 +5,7 @@ from functools import lru_cache
 from typing import Optional, Dict, Any
 from io import BytesIO
 
-from PyPDF2 import PdfReader
+from pypdf import PdfReader
 
 from services.box_mcp_client import BoxMCPClient, BoxMCPClientError
 

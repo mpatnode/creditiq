@@ -342,6 +342,52 @@ class BoxMCPClient:
         
         return await self._call_tool("box_update_file_metadata", arguments)
 
+    async def box_ai_ask(
+        self,
+        file_ids: List[str],
+        prompt: str,
+        mode: str = "multiple_item_qa"
+    ) -> MCPToolResult:
+        """Ask Box AI a question about one or more documents.
+        
+        Args:
+            file_ids: List of Box file IDs to query
+            prompt: Question or instruction for Box AI
+            mode: Query mode - "single_item_qa" or "multiple_item_qa"
+            
+        Returns:
+            MCPToolResult containing Box AI response
+        """
+        arguments = {
+            "items": [{"type": "file", "id": file_id} for file_id in file_ids],
+            "prompt": prompt,
+            "mode": mode,
+        }
+        
+        return await self._call_tool("box_ai_ask", arguments)
+
+    async def box_ai_extract(
+        self,
+        file_id: str,
+        fields: List[Dict[str, Any]]
+    ) -> MCPToolResult:
+        """Extract structured data from a document using Box AI.
+        
+        Args:
+            file_id: Box file ID
+            fields: List of field definitions to extract
+                   Each field should have: key, type, prompt, options (optional)
+            
+        Returns:
+            MCPToolResult containing extracted structured data
+        """
+        arguments = {
+            "file_id": file_id,
+            "fields": fields,
+        }
+        
+        return await self._call_tool("box_ai_extract", arguments)
+
     async def __aenter__(self):
         """Async context manager entry."""
         await self.connect_to_mcp()

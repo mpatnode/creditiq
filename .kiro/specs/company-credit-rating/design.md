@@ -4,7 +4,17 @@
 
 The Company Credit Rating System is a web application that generates credit ratings for public companies by combining financial data retrieval with LLM-based methodology interpretation. The system accepts a company name or ticker symbol, retrieves current financial data from external providers, and applies a credit rating methodology defined in a PDF document stored in Box using an LLM to interpret and execute the methodology logic.
 
-The architecture follows a layered approach with clear separation between the web interface, business logic, data retrieval, LLM integration, and Box platform integration layers. Box serves as the central document management platform for storing the methodology PDF, generated rating reports, and historical documentation. The system leverages the self-hosted Box MCP (Model Context Protocol) server to interact with Box, providing a standardized interface for all Box operations and eliminating the need for direct SDK integration. This design enables the system to be flexible (supporting PDF-based methodology), maintainable (clear component boundaries with MCP abstraction), secure (leveraging Box's enterprise security and MCP's authentication handling), and extensible (supporting future structured methodology formats).
+The architecture follows a layered approach with clear separation between the web interface, business logic, data retrieval, LLM integration, and Box platform integration layers. Box serves as the central document management platform for storing the methodology PDF, generated rating reports, and historical documentation. The system leverages the self-hosted Box MCP (Model Context Protocol) server to interact with Box, providing a standardized interface for all Box operations and eliminating the need for direct SDK integration.
+
+**Architecture Decision - Box AI Integration:**
+The system uses Box MCP for both document management and AI analysis. The Box MCP server (as documented at https://developer.box.com/guides/box-mcp/self-hosted/) provides file operations (search, read, upload, folders, metadata) and Box AI capabilities (box_ai_ask, box_ai_extract). This unified approach offers several advantages:
+- **Simplified Architecture**: Single integration point for storage and AI
+- **Native Document Understanding**: Box AI can directly analyze PDFs without text extraction
+- **Enterprise Security**: Box AI inherits Box's security, compliance, and access controls
+- **No Additional API Keys**: No need for separate OpenAI/Anthropic credentials
+- **Multi-Document Analysis**: Box AI can analyze methodology PDF and financial data together
+
+The workflow is: Upload financial data to Box → Use Box AI to analyze methodology PDF + financial data → Generate rating → Store results in Box.
 
 ## Architecture
 
@@ -21,25 +31,33 @@ graph TB
     UI[Web UI]
     API[API Server]
     RatingEngine[Rating Engine]
-    LLM[LLM Service]
+    BoxAI[Box AI Service]
     DataRetriever[Financial Data Retriever]
     Storage[Rating Storage]
     MethodologyLoader[Methodology Loader]
-    BoxClient[Box Client]
     
     UI --> API
     API --> RatingEngine
-    RatingEngine --> LLM
+    RatingEngine --> BoxAI
     RatingEngine --> DataRetriever
     RatingEngine --> MethodologyLoader
     RatingEngine --> Storage
-    MethodologyLoader --> BoxMCP[Box MCP Client]
+    
+    BoxAI --> BoxMCP[Box MCP Client]
+    MethodologyLoader --> BoxMCP
     Storage --> BoxMCP
     Storage --> DB[(Database)]
+    
     BoxMCP --> MCPServer[Box MCP Server]
     MCPServer --> BoxAPI[Box Platform API]
+    MCPServer --> BoxAIAPI[Box AI API]
     
     DataRetriever --> FinancialAPI[Financial Data Provider API]
+    
+    style BoxAI fill:#e1f5ff
+    style BoxMCP fill:#fff4e1
+    style MCPServer fill:#fff4e1
+    style BoxAIAPI fill:#e1f5ff
 ```
 
 ## Components and Interfaces
@@ -78,7 +96,7 @@ graph TB
 **Responsibilities:**
 - Orchestrate the rating calculation workflow
 - Retrieve financial data for target company
-- Load and prepare methodology context
+- Load methodology content from Box via MethodologyLoader
 - Invoke LLM to apply methodology
 - Parse and validate LLM output
 - Store rating results
@@ -113,45 +131,86 @@ class RatingResult:
     methodology_version: str
 ```
 
-### 4. LLM Service Component
+### 4. Box AI Service Component
 
 **Responsibilities:**
-- Interface with LLM API (e.g., OpenAI, Anthropic)
-- Format prompts with methodology and financial data
-- Parse structured responses from LLM
+- Interface with Box AI through MCP server
+- Use Box AI to analyze methodology PDF and financial data documents
+- Format prompts for Box AI queries
+- Parse structured responses from Box AI
 - Handle retries and error cases
-- Optionally cache methodology interpretations
+- Leverage Box AI's native document understanding capabilities
+
+**Box AI Integration:**
+The Box MCP server provides Box AI tools including `box_ai_ask` and `box_ai_extract` which allow querying documents stored in Box. This enables the system to:
+- Ask Box AI questions about the methodology PDF directly
+- Analyze financial data documents uploaded to Box
+- Get structured responses from Box AI without managing separate LLM API keys
+- Leverage Box's enterprise-grade AI with built-in security and compliance
 
 **Key Interfaces:**
 ```python
-from typing import Optional
+from typing import Optional, List
 
-class LLMService:
-    """Interface with LLM API for methodology application."""
+class BoxAIService:
+    """Interface with Box AI via MCP for methodology application."""
+    
+    def __init__(self, box_client: BoxMCPClient):
+        """Initialize Box AI service with Box MCP client."""
+        pass
     
     def apply_methodology(
         self,
-        methodology: str,
-        financial_data: FinancialData,
+        methodology_file_id: str,
+        financial_data_file_id: str,
         options: Optional[Dict[str, Any]] = None
-    ) -> LLMResponse:
-        """Apply methodology to financial data using LLM."""
+    ) -> BoxAIResponse:
+        """Apply methodology to financial data using Box AI.
+        
+        Uses Box AI to analyze the methodology PDF and financial data
+        document to generate a credit rating.
+        """
+        pass
+    
+    def ask_box_ai(
+        self,
+        file_ids: List[str],
+        prompt: str,
+        mode: str = "multiple_item_qa"
+    ) -> BoxAIResponse:
+        """Ask Box AI a question about one or more documents.
+        
+        Args:
+            file_ids: List of Box file IDs to query
+            prompt: Question or instruction for Box AI
+            mode: Query mode - "single_item_qa" or "multiple_item_qa"
+        """
+        pass
+    
+    def extract_structured_data(
+        self,
+        file_id: str,
+        fields: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Extract structured data from a document using Box AI Extract."""
         pass
     
     def convert_methodology_to_structured(
         self,
-        methodology_pdf: str
+        methodology_file_id: str
     ) -> StructuredMethodology:
-        """Convert PDF methodology to structured format using LLM."""
+        """Convert PDF methodology to structured format using Box AI."""
         pass
 
 @dataclass
-class LLMResponse:
+class BoxAIResponse:
     rating: str
     score: float
     reasoning: str
     metrics: Dict[str, float]
     breakdown: List[MetricBreakdown]
+    raw_response: str
+    completion_reason: str
 ```
 
 ### 5. Financial Data Retriever Component
@@ -234,16 +293,25 @@ class MethodologyLoader:
 - Leverage MCP for methodology PDF retrieval
 - Use MCP for rating report uploads and folder management
 - Handle MCP tool responses and errors
+- Support future Box AI capabilities if added to MCP server
 
-The Box MCP server provides standardized tools for Box operations, eliminating the need for direct Box SDK integration and authentication management. The MCP server handles all Box authentication and API interactions.
-
+The Box MCP server provides standardized tools for Box operations, eliminating the need for
 **Key MCP Tools Used:**
+According to https://developer.box.com/guides/box-mcp/self-hosted/, the Box MCP server provides:
+
+**File Management Tools:**
 - `box_search`: Search for files and folders in Box
 - `box_get_file_info`: Get metadata about a specific file
 - `box_read_file`: Download and read file contents
 - `box_upload_file`: Upload new files to Box
 - `box_create_folder`: Create new folders
 - `box_update_file_metadata`: Add/update custom metadata on files
+
+**Box AI Tools:**
+- `box_ai_ask`: Ask questions about documents stored in Box
+- `box_ai_extract`: Extract structured data from documents using AI
+- Supports single and multiple document queries
+- Returns AI-generated responses with citations and reasoning
 
 **Key Interfaces:**
 ```python
@@ -641,9 +709,9 @@ Integration tests will use real Box sandbox environment and mock financial data 
 - **Web Framework**: Flask with Flask-RESTX for API documentation
 - **Box Integration**: Self-hosted Box MCP Server (https://developer.box.com/guides/box-mcp/self-hosted/)
 - **MCP Client**: mcp Python package for connecting to MCP server
-- **LLM Integration**: OpenAI Python SDK or Anthropic Python SDK
+- **AI Integration**: Box AI via MCP (box_ai_ask, box_ai_extract tools)
 - **Database**: PostgreSQL with SQLAlchemy ORM
-- **PDF Processing**: PyPDF2 or pdfplumber
+- **PDF Processing**: PyPDF2 for optional text extraction (Box AI can read PDFs directly)
 - **Testing**: pytest + Hypothesis (property-based testing)
 
 ### Frontend
@@ -702,10 +770,14 @@ The application will be deployed as stateless containers that can scale horizont
 ### Box MCP Server Setup
 
 The self-hosted Box MCP server will be configured following the official guide:
-- Installation: Follow https://developer.box.com/guides/box-mcp/self-hosted/
-- Authentication: Configure Box Custom App with JWT authentication
-- Configuration: Set up MCP server with appropriate Box folder access
-- Deployment: Run MCP server as a sidecar process or separate service accessible to app servers
+- **Installation**: Install via npm: `npx -y @modelcontextprotocol/server-box <config.json>`
+- **Authentication**: Configure Box Custom App with JWT authentication (config.json file)
+- **Configuration**: Set up MCP server with appropriate Box folder access and AI permissions
+- **Deployment**: Run MCP server as a subprocess managed by the application or via Kiro's MCP integration
+- **Available Tools**: 
+  - File management: search, read, upload, create folders, metadata
+  - Box AI: box_ai_ask (query documents), box_ai_extract (structured data extraction)
+- **AI Integration**: Box AI provides native document understanding without requiring separate LLM API keys
 
 ### Box Folder Structure
 
