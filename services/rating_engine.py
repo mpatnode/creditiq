@@ -23,19 +23,16 @@ from services.financial_data_retriever import (
 )
 from services.methodology_loader import MethodologyLoader
 from services.box_mcp_client import BoxMCPClient, BoxMCPToolError
+from app.exceptions import (
+    RatingEngineError,
+    RatingValidationError,
+    MethodologyError,
+    BoxUploadError,
+    InvalidRatingError,
+)
 
 
 logger = logging.getLogger(__name__)
-
-
-class RatingEngineError(Exception):
-    """Base exception for Rating Engine errors."""
-    pass
-
-
-class RatingValidationError(RatingEngineError):
-    """Exception raised when rating validation fails."""
-    pass
 
 
 @dataclass
@@ -180,7 +177,12 @@ class RatingEngine:
             )
             
             if not upload_result.success:
-                raise RatingEngineError(f"Failed to upload financial data: {upload_result.error}")
+                logger.error(f"Failed to upload financial data: {upload_result.error}")
+                raise BoxUploadError(
+                    message=f"Failed to upload financial data: {upload_result.error}",
+                    user_message="Failed to save financial data. Please try again.",
+                    details={"file_name": file_name}
+                )
             
             # Extract file ID from upload result
             financial_data_file_id = self._extract_file_id_from_upload(upload_result.data)
@@ -216,15 +218,22 @@ class RatingEngine:
             
             return rating_result
             
-        except BoxAIServiceError as e:
-            logger.error(f"Box AI service error: {e}")
-            raise RatingEngineError(f"Rating calculation failed: {e}") from e
+        except (BoxAIServiceError, BoxUploadError, RatingValidationError):
+            raise
         except BoxMCPToolError as e:
-            logger.error(f"Box MCP tool error: {e}")
-            raise RatingEngineError(f"Box operation failed: {e}") from e
+            logger.error(f"Box MCP tool error: {e}", exc_info=True)
+            raise RatingEngineError(
+                message=f"Box operation failed: {e}",
+                user_message="Document operation failed. Please try again.",
+                details={"company": company.ticker}
+            ) from e
         except Exception as e:
-            logger.error(f"Unexpected error in rating calculation: {e}")
-            raise RatingEngineError(f"Rating calculation failed: {e}") from e
+            logger.error(f"Unexpected error in rating calculation: {e}", exc_info=True)
+            raise RatingEngineError(
+                message=f"Rating calculation failed: {e}",
+                user_message="Unable to calculate credit rating. Please try again.",
+                details={"company": company.ticker}
+            ) from e
         finally:
             # Step 7: Clean up temporary financial data file
             if financial_data_file_id:
@@ -338,15 +347,20 @@ class RatingEngine:
             # Validate rating is valid
             valid_ratings = [r.value for r in CreditRating]
             if box_ai_response.rating not in valid_ratings:
-                raise RatingValidationError(
-                    f"Invalid rating '{box_ai_response.rating}'. "
-                    f"Must be one of: {', '.join(valid_ratings)}"
+                logger.error(f"Invalid rating: {box_ai_response.rating}")
+                raise InvalidRatingError(
+                    message=f"Invalid rating '{box_ai_response.rating}'. Must be one of: {', '.join(valid_ratings)}",
+                    user_message="Rating calculation produced invalid rating. Please try again.",
+                    details={"rating": box_ai_response.rating, "valid_ratings": valid_ratings}
                 )
             
             # Validate score is in range
             if not 0 <= box_ai_response.score <= 100:
+                logger.error(f"Score outside valid range: {box_ai_response.score}")
                 raise RatingValidationError(
-                    f"Score {box_ai_response.score} is outside valid range [0, 100]"
+                    message=f"Score {box_ai_response.score} is outside valid range [0, 100]",
+                    user_message="Rating calculation produced invalid score. Please try again.",
+                    details={"score": box_ai_response.score}
                 )
             
             # Extract financial metrics from Box AI response
@@ -367,14 +381,25 @@ class RatingEngine:
                 reasoning=box_ai_response.reasoning,
             )
             
+            logger.info(f"Rating validation successful: {rating_result.rating}")
             return rating_result
             
+        except (InvalidRatingError, RatingValidationError):
+            raise
         except ValidationError as e:
-            logger.error(f"Rating validation failed: {e}")
-            raise RatingValidationError(f"Invalid rating data: {e}") from e
+            logger.error(f"Rating validation failed: {e}", exc_info=True)
+            raise RatingValidationError(
+                message=f"Invalid rating data: {e}",
+                user_message="Rating calculation produced invalid results. Please try again.",
+                details={"error": str(e)}
+            ) from e
         except Exception as e:
-            logger.error(f"Unexpected error in rating validation: {e}")
-            raise RatingValidationError(f"Rating validation failed: {e}") from e
+            logger.error(f"Unexpected error in rating validation: {e}", exc_info=True)
+            raise RatingValidationError(
+                message=f"Rating validation failed: {e}",
+                user_message="Rating validation failed. Please try again.",
+                details={"error": str(e)}
+            ) from e
 
     async def _prepare_source_documents(
         self,

@@ -12,20 +12,29 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
     retry_if_exception_type,
+    RetryError,
 )
 
 from services.box_mcp_client import BoxMCPClient, BoxMCPToolError
+from app.exceptions import (
+    BoxAIError,
+    BoxAIUnavailableError,
+    BoxAIResponseError,
+    BoxAITimeoutError,
+    RetryExhaustedError,
+)
 
 
 logger = logging.getLogger(__name__)
 
 
-class BoxAIServiceError(Exception):
+# Keep legacy exceptions for backward compatibility
+class BoxAIServiceError(BoxAIError):
     """Base exception for Box AI Service errors."""
     pass
 
 
-class BoxAIResponseParsingError(BoxAIServiceError):
+class BoxAIResponseParsingError(BoxAIResponseError):
     """Exception raised when Box AI response cannot be parsed."""
     pass
 
@@ -150,14 +159,22 @@ class BoxAIService:
             
             return box_ai_response
             
-        except BoxMCPToolError as e:
-            logger.error(f"Box AI query failed: {e}")
-            raise BoxAIServiceError(f"Failed to apply methodology: {e}") from e
-        except BoxAIResponseParsingError:
+        except (BoxAIResponseParsingError, BoxAIUnavailableError, BoxAITimeoutError):
             raise
+        except BoxMCPToolError as e:
+            logger.error(f"Box AI query failed: {e}", exc_info=True)
+            raise BoxAIServiceError(
+                message=f"Failed to apply methodology: {e}",
+                user_message="Unable to analyze documents. Please try again.",
+                details={"methodology_file_id": methodology_file_id, "financial_data_file_id": financial_data_file_id}
+            ) from e
         except Exception as e:
-            logger.error(f"Unexpected error in apply_methodology: {e}")
-            raise BoxAIServiceError(f"Methodology application failed: {e}") from e
+            logger.error(f"Unexpected error in apply_methodology: {e}", exc_info=True)
+            raise BoxAIServiceError(
+                message=f"Methodology application failed: {e}",
+                user_message="Unable to calculate rating. Please try again.",
+                details={"methodology_file_id": methodology_file_id, "financial_data_file_id": financial_data_file_id}
+            ) from e
 
     def _construct_rating_prompt(self, options: Optional[Dict[str, Any]] = None) -> str:
         """Construct prompt for Box AI rating analysis.
@@ -212,7 +229,7 @@ Ensure your response is valid JSON and includes all required fields."""
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=2, min=4, max=30),
-        retry=retry_if_exception_type(BoxAIServiceError),
+        retry=retry_if_exception_type((BoxAIServiceError, BoxAIUnavailableError)),
     )
     async def ask_box_ai(
         self,
@@ -232,6 +249,9 @@ Ensure your response is valid JSON and includes all required fields."""
             
         Raises:
             BoxAIServiceError: If Box AI query fails
+            BoxAIUnavailableError: If Box AI service is unavailable
+            BoxAITimeoutError: If Box AI request times out
+            RetryExhaustedError: If all retries are exhausted
         """
         logger.debug(f"Querying Box AI with {len(file_ids)} file(s), mode: {mode}")
         
@@ -243,7 +263,27 @@ Ensure your response is valid JSON and includes all required fields."""
             )
             
             if not result.success:
-                raise BoxAIServiceError(f"Box AI query failed: {result.error}")
+                error_msg = result.error or "Unknown error"
+                
+                # Check for specific error types
+                if "timeout" in error_msg.lower():
+                    raise BoxAITimeoutError(
+                        message=f"Box AI request timed out: {error_msg}",
+                        user_message="Document analysis is taking longer than expected. Please try again.",
+                        details={"file_ids": file_ids}
+                    )
+                elif "unavailable" in error_msg.lower() or "503" in error_msg:
+                    raise BoxAIUnavailableError(
+                        message=f"Box AI service unavailable: {error_msg}",
+                        user_message="Document analysis service is temporarily unavailable. Please try again later.",
+                        details={"file_ids": file_ids}
+                    )
+                
+                raise BoxAIServiceError(
+                    message=f"Box AI query failed: {error_msg}",
+                    user_message="Unable to analyze documents. Please try again.",
+                    details={"file_ids": file_ids}
+                )
             
             # Extract response content
             response_data = self._extract_response_content(result.data)
@@ -252,9 +292,29 @@ Ensure your response is valid JSON and includes all required fields."""
             
             return response_data
             
+        except (BoxAITimeoutError, BoxAIUnavailableError, BoxAIServiceError):
+            raise
+        except RetryError as e:
+            logger.error(f"Box AI query failed after all retries: {e}", exc_info=True)
+            raise RetryExhaustedError(
+                message=f"Box AI query failed after multiple attempts: {e}",
+                user_message="Document analysis service is temporarily unavailable after multiple attempts. Please try again later.",
+                details={"file_ids": file_ids, "max_attempts": 3}
+            ) from e
         except BoxMCPToolError as e:
-            logger.error(f"Box AI tool execution failed: {e}")
-            raise BoxAIServiceError(f"Box AI query failed: {e}") from e
+            logger.error(f"Box AI tool execution failed: {e}", exc_info=True)
+            raise BoxAIServiceError(
+                message=f"Box AI query failed: {e}",
+                user_message="Unable to analyze documents. Please try again.",
+                details={"file_ids": file_ids}
+            ) from e
+        except Exception as e:
+            logger.error(f"Unexpected error in Box AI query: {e}", exc_info=True)
+            raise BoxAIServiceError(
+                message=f"Unexpected Box AI error: {e}",
+                user_message="Unable to analyze documents. Please try again.",
+                details={"file_ids": file_ids}
+            ) from e
 
     def _extract_response_content(self, data: Any) -> Dict[str, Any]:
         """Extract content from Box AI response data.
@@ -312,7 +372,12 @@ Ensure your response is valid JSON and includes all required fields."""
             completion_reason = response_data.get("completion_reason", "done")
             
             if not answer_text:
-                raise BoxAIResponseParsingError("Empty response from Box AI")
+                logger.error("Empty response from Box AI")
+                raise BoxAIResponseParsingError(
+                    message="Empty response from Box AI",
+                    user_message="Document analysis produced no results. Please try again.",
+                    details={}
+                )
             
             # Try to extract JSON from the response
             # Box AI might wrap JSON in markdown code blocks
@@ -325,14 +390,26 @@ Ensure your response is valid JSON and includes all required fields."""
                 logger.error(f"Failed to parse JSON from Box AI response: {e}")
                 logger.debug(f"Response text: {answer_text[:500]}")
                 raise BoxAIResponseParsingError(
-                    f"Invalid JSON in Box AI response: {e}"
+                    message=f"Invalid JSON in Box AI response: {e}",
+                    user_message="Document analysis produced invalid results. Please try again.",
+                    details={"error": str(e)}
                 ) from e
             
             # Validate required fields
             if "rating" not in parsed_data:
-                raise BoxAIResponseParsingError("Missing 'rating' field in response")
+                logger.error("Missing 'rating' field in Box AI response")
+                raise BoxAIResponseParsingError(
+                    message="Missing 'rating' field in response",
+                    user_message="Document analysis is incomplete. Please try again.",
+                    details={}
+                )
             if "score" not in parsed_data:
-                raise BoxAIResponseParsingError("Missing 'score' field in response")
+                logger.error("Missing 'score' field in Box AI response")
+                raise BoxAIResponseParsingError(
+                    message="Missing 'score' field in response",
+                    user_message="Document analysis is incomplete. Please try again.",
+                    details={}
+                )
             
             # Parse breakdown if present
             breakdown = []
@@ -360,8 +437,11 @@ Ensure your response is valid JSON and includes all required fields."""
             
             # Validate score is in valid range
             if not 0 <= box_ai_response.score <= 100:
+                logger.error(f"Score {box_ai_response.score} is outside valid range")
                 raise BoxAIResponseParsingError(
-                    f"Score {box_ai_response.score} is outside valid range [0, 100]"
+                    message=f"Score {box_ai_response.score} is outside valid range [0, 100]",
+                    user_message="Document analysis produced invalid score. Please try again.",
+                    details={"score": box_ai_response.score}
                 )
             
             return box_ai_response
@@ -369,9 +449,11 @@ Ensure your response is valid JSON and includes all required fields."""
         except BoxAIResponseParsingError:
             raise
         except Exception as e:
-            logger.error(f"Unexpected error parsing Box AI response: {e}")
+            logger.error(f"Unexpected error parsing Box AI response: {e}", exc_info=True)
             raise BoxAIResponseParsingError(
-                f"Failed to parse Box AI response: {e}"
+                message=f"Failed to parse Box AI response: {e}",
+                user_message="Document analysis produced invalid results. Please try again.",
+                details={"error": str(e)}
             ) from e
 
     def _extract_json_from_text(self, text: str) -> str:
@@ -418,9 +500,11 @@ Ensure your response is valid JSON and includes all required fields."""
         """
         valid_ratings = [r.value for r in CreditRating]
         if rating not in valid_ratings:
+            logger.error(f"Invalid credit rating: {rating}")
             raise BoxAIResponseParsingError(
-                f"Invalid credit rating '{rating}'. "
-                f"Must be one of: {', '.join(valid_ratings)}"
+                message=f"Invalid credit rating '{rating}'. Must be one of: {', '.join(valid_ratings)}",
+                user_message="Document analysis produced invalid rating. Please try again.",
+                details={"rating": rating, "valid_ratings": valid_ratings}
             )
 
     async def extract_structured_data(

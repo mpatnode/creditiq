@@ -1,10 +1,24 @@
 """Financial Data Retriever component for fetching company financial data from SEC EDGAR."""
 import os
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 import requests
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, stop_after_attempt, wait_exponential, RetryError
+
+from app.exceptions import (
+    CompanyNotFoundError,
+    DataProviderUnavailableError,
+    DataProviderRateLimitError,
+    IncompleteDataError,
+    StaleDataError,
+    NetworkError,
+    RetryExhaustedError,
+)
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -94,16 +108,72 @@ class FinancialDataRetriever:
             JSON response from the API
             
         Raises:
-            requests.RequestException: If request fails after retries
+            DataProviderUnavailableError: If service is unavailable
+            DataProviderRateLimitError: If rate limit is exceeded
+            NetworkError: If network error occurs
+            RetryExhaustedError: If all retries are exhausted
         """
-        response = requests.get(
-            url,
-            params=params,
-            headers=self.headers,
-            timeout=self.timeout
-        )
-        response.raise_for_status()
-        return response.json()
+        try:
+            logger.debug(f"Making request to {url}")
+            response = requests.get(
+                url,
+                params=params,
+                headers=self.headers,
+                timeout=self.timeout
+            )
+            
+            # Check for rate limiting
+            if response.status_code == 429:
+                logger.warning(f"Rate limit exceeded for {url}")
+                raise DataProviderRateLimitError(
+                    message=f"Rate limit exceeded: {response.text}",
+                    user_message="Too many requests. Please wait a moment and try again.",
+                    details={"url": url, "status_code": 429}
+                )
+            
+            # Check for service unavailable
+            if response.status_code in (502, 503, 504):
+                logger.warning(f"Service unavailable: {response.status_code}")
+                raise DataProviderUnavailableError(
+                    message=f"Service unavailable: {response.status_code}",
+                    user_message="Financial data service is temporarily unavailable. Please try again later.",
+                    details={"url": url, "status_code": response.status_code}
+                )
+            
+            response.raise_for_status()
+            logger.debug(f"Request to {url} succeeded")
+            return response.json()
+        
+        except (DataProviderRateLimitError, DataProviderUnavailableError):
+            raise
+        except requests.Timeout as e:
+            logger.error(f"Request timeout for {url}: {e}")
+            raise NetworkError(
+                message=f"Request timeout: {e}",
+                user_message="Request timed out. Please try again.",
+                details={"url": url}
+            ) from e
+        except requests.ConnectionError as e:
+            logger.error(f"Connection error for {url}: {e}")
+            raise NetworkError(
+                message=f"Connection error: {e}",
+                user_message="Network connection error. Please check your connection and try again.",
+                details={"url": url}
+            ) from e
+        except RetryError as e:
+            logger.error(f"Request failed after all retries for {url}: {e}", exc_info=True)
+            raise RetryExhaustedError(
+                message=f"Request failed after multiple attempts: {e}",
+                user_message="Service is temporarily unavailable after multiple attempts. Please try again later.",
+                details={"url": url, "max_attempts": 3}
+            ) from e
+        except requests.RequestException as e:
+            logger.error(f"Request failed for {url}: {e}", exc_info=True)
+            raise DataProviderUnavailableError(
+                message=f"Request failed: {e}",
+                user_message="Financial data service is temporarily unavailable. Please try again later.",
+                details={"url": url}
+            ) from e
 
     
     def _load_company_tickers(self) -> Dict[str, Any]:
@@ -140,25 +210,49 @@ class FinancialDataRetriever:
             
         Returns:
             List of matching companies
+            
+        Raises:
+            CompanyNotFoundError: If no companies match the query
         """
-        tickers_map = self._load_company_tickers()
-        query_upper = query.upper().strip()
-        matches = []
+        try:
+            logger.info(f"Searching for companies matching: {query}")
+            tickers_map = self._load_company_tickers()
+            query_upper = query.upper().strip()
+            matches = []
+            
+            for ticker, info in tickers_map.items():
+                # Match by ticker or company name
+                if (query_upper in ticker or 
+                    query_upper in info['name'].upper()):
+                    matches.append(Company(
+                        id=info['cik'],
+                        name=info['name'],
+                        ticker=ticker,
+                        exchange="",  # SEC data doesn't include exchange
+                        sector="",    # Will be populated from company facts if needed
+                        industry=""   # Will be populated from company facts if needed
+                    ))
+            
+            if not matches:
+                logger.warning(f"No companies found matching: {query}")
+                raise CompanyNotFoundError(
+                    message=f"No companies found matching '{query}'",
+                    user_message="Company not found. Please check the company name or ticker symbol.",
+                    details={"query": query}
+                )
+            
+            logger.info(f"Found {len(matches)} companies matching: {query}")
+            return matches
         
-        for ticker, info in tickers_map.items():
-            # Match by ticker or company name
-            if (query_upper in ticker or 
-                query_upper in info['name'].upper()):
-                matches.append(Company(
-                    id=info['cik'],
-                    name=info['name'],
-                    ticker=ticker,
-                    exchange="",  # SEC data doesn't include exchange
-                    sector="",    # Will be populated from company facts if needed
-                    industry=""   # Will be populated from company facts if needed
-                ))
-        
-        return matches
+        except CompanyNotFoundError:
+            raise
+        except Exception as e:
+            logger.error(f"Error searching for companies: {e}", exc_info=True)
+            raise DataProviderUnavailableError(
+                message=f"Company search failed: {e}",
+                user_message="Unable to search for companies. Please try again later.",
+                details={"query": query}
+            ) from e
     
     def _get_company_facts(self, cik: str) -> Dict[str, Any]:
         """Get company facts from SEC EDGAR.
@@ -286,60 +380,86 @@ class FinancialDataRetriever:
             Complete financial data for the company
             
         Raises:
-            ValueError: If company not found or data unavailable
+            CompanyNotFoundError: If company not found
+            IncompleteDataError: If data is incomplete
+            DataProviderUnavailableError: If data retrieval fails
         """
-        # If identifier looks like a CIK (numeric), use it directly
-        if identifier.isdigit():
-            cik = identifier.zfill(10)
-            # Look up company name from tickers
-            tickers_map = self._load_company_tickers()
-            company_name = None
-            ticker = None
-            for tick, info in tickers_map.items():
-                if info['cik'] == cik:
-                    company_name = info['name']
-                    ticker = tick
-                    break
-            if not company_name:
-                company_name = f"Company-{cik}"
-                ticker = identifier
-        else:
-            # Search by ticker
-            companies = self.search_companies(identifier)
-            if not companies:
-                raise ValueError(f"Company not found: {identifier}")
+        try:
+            logger.info(f"Retrieving financial data for: {identifier}")
             
-            # Use first match
-            company = companies[0]
-            cik = company.id
-            company_name = company.name
-            ticker = company.ticker
+            # If identifier looks like a CIK (numeric), use it directly
+            if identifier.isdigit():
+                cik = identifier.zfill(10)
+                # Look up company name from tickers
+                tickers_map = self._load_company_tickers()
+                company_name = None
+                ticker = None
+                for tick, info in tickers_map.items():
+                    if info['cik'] == cik:
+                        company_name = info['name']
+                        ticker = tick
+                        break
+                if not company_name:
+                    logger.warning(f"Company name not found for CIK: {cik}")
+                    company_name = f"Company-{cik}"
+                    ticker = identifier
+            else:
+                # Search by ticker
+                companies = self.search_companies(identifier)
+                if not companies:
+                    raise CompanyNotFoundError(
+                        message=f"Company not found: {identifier}",
+                        user_message="Company not found. Please check the company name or ticker symbol.",
+                        details={"identifier": identifier}
+                    )
+                
+                # Use first match
+                company = companies[0]
+                cik = company.id
+                company_name = company.name
+                ticker = company.ticker
+            
+            # Get company facts
+            logger.debug(f"Fetching company facts for CIK: {cik}")
+            facts = self._get_company_facts(cik)
+            
+            # Extract financial statements
+            logger.debug("Extracting financial statements")
+            financial_statements = self._extract_financial_statements(facts)
+            
+            # Get filing date
+            data_date = self._get_latest_filing_date(facts)
+            if not data_date:
+                logger.warning("Could not determine filing date, using current date")
+                data_date = datetime.now()
+            
+            # Market data placeholder (SEC doesn't provide market data)
+            market_data = {
+                'note': 'Market data not available from SEC EDGAR',
+                'source': 'SEC EDGAR'
+            }
+            
+            financial_data = FinancialData(
+                company_id=cik,
+                company_name=company_name,
+                ticker=ticker,
+                financial_statements=financial_statements,
+                market_data=market_data,
+                data_date=data_date
+            )
+            
+            logger.info(f"Successfully retrieved financial data for {ticker}")
+            return financial_data
         
-        # Get company facts
-        facts = self._get_company_facts(cik)
-        
-        # Extract financial statements
-        financial_statements = self._extract_financial_statements(facts)
-        
-        # Get filing date
-        data_date = self._get_latest_filing_date(facts)
-        if not data_date:
-            data_date = datetime.now()
-        
-        # Market data placeholder (SEC doesn't provide market data)
-        market_data = {
-            'note': 'Market data not available from SEC EDGAR',
-            'source': 'SEC EDGAR'
-        }
-        
-        return FinancialData(
-            company_id=cik,
-            company_name=company_name,
-            ticker=ticker,
-            financial_statements=financial_statements,
-            market_data=market_data,
-            data_date=data_date
-        )
+        except CompanyNotFoundError:
+            raise
+        except Exception as e:
+            logger.error(f"Failed to retrieve financial data for {identifier}: {e}", exc_info=True)
+            raise DataProviderUnavailableError(
+                message=f"Failed to retrieve financial data: {e}",
+                user_message="Unable to retrieve financial data. Please try again later.",
+                details={"identifier": identifier}
+            ) from e
     
     def validate_data_quality(self, data: FinancialData) -> DataQualityReport:
         """Validate completeness and freshness of financial data.

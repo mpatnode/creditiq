@@ -7,13 +7,15 @@ from io import BytesIO
 
 from pypdf import PdfReader
 
-from services.box_mcp_client import BoxMCPClient, BoxMCPClientError
+from services.box_mcp_client import BoxMCPClient, BoxMCPClientError, BoxMCPToolError
+from app.exceptions import MethodologyError
 
 
 logger = logging.getLogger(__name__)
 
 
-class MethodologyLoaderError(Exception):
+# Keep legacy exception for backward compatibility
+class MethodologyLoaderError(MethodologyError):
     """Base exception for Methodology Loader errors."""
     pass
 
@@ -81,12 +83,20 @@ class MethodologyLoader:
             
             return text_content
             
-        except BoxMCPClientError as e:
-            logger.error(f"Failed to load methodology from Box: {e}")
-            raise MethodologyLoaderError(f"Box operation failed: {e}") from e
+        except (BoxMCPClientError, BoxMCPToolError) as e:
+            logger.error(f"Failed to load methodology from Box: {e}", exc_info=True)
+            raise MethodologyLoaderError(
+                message=f"Box operation failed: {e}",
+                user_message="Unable to load rating methodology. Please contact support.",
+                details={"file_id": target_file_id}
+            ) from e
         except Exception as e:
-            logger.error(f"Failed to extract text from methodology PDF: {e}")
-            raise MethodologyLoaderError(f"PDF extraction failed: {e}") from e
+            logger.error(f"Failed to extract text from methodology PDF: {e}", exc_info=True)
+            raise MethodologyLoaderError(
+                message=f"PDF extraction failed: {e}",
+                user_message="Unable to process methodology document. Please contact support.",
+                details={"file_id": target_file_id}
+            ) from e
 
     def _extract_text_from_pdf(self, pdf_bytes: bytes) -> str:
         """Extract text content from PDF bytes.

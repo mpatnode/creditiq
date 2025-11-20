@@ -44,10 +44,14 @@ class TestFinancialDataRetriever:
     
     def test_search_companies_no_match(self):
         """Test searching with no matches."""
-        retriever = FinancialDataRetriever()
-        results = retriever.search_companies("NONEXISTENTCOMPANY12345")
+        from app.exceptions import CompanyNotFoundError
         
-        assert len(results) == 0
+        retriever = FinancialDataRetriever()
+        
+        with pytest.raises(CompanyNotFoundError) as exc_info:
+            retriever.search_companies("NONEXISTENTCOMPANY12345")
+        
+        assert "not found" in exc_info.value.user_message.lower()
     
     def test_get_company_data_by_ticker(self):
         """Test retrieving company data by ticker."""
@@ -71,9 +75,11 @@ class TestFinancialDataRetriever:
     
     def test_get_company_data_invalid_ticker(self):
         """Test retrieving data for invalid ticker."""
+        from app.exceptions import CompanyNotFoundError
+        
         retriever = FinancialDataRetriever()
         
-        with pytest.raises(ValueError, match="Company not found"):
+        with pytest.raises(CompanyNotFoundError, match="No companies found"):
             retriever.get_company_data("INVALIDTICKER12345")
     
     def test_validate_data_quality_complete_fresh(self):

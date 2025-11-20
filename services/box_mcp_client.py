@@ -9,11 +9,21 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
     retry_if_exception_type,
+    RetryError,
 )
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from mcp.client.sse import sse_client
+
+from app.exceptions import (
+    BoxConnectionError,
+    BoxError,
+    BoxFileNotFoundError,
+    BoxUploadError,
+    RetryExhaustedError,
+    NetworkError,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -28,21 +38,19 @@ class MCPToolResult:
     error: Optional[str] = None
 
 
-class BoxMCPClientError(Exception):
+# Keep legacy exceptions for backward compatibility
+class BoxMCPClientError(BoxError):
     """Base exception for Box MCP Client errors."""
-
     pass
 
 
-class BoxMCPConnectionError(BoxMCPClientError):
+class BoxMCPConnectionError(BoxConnectionError):
     """Exception raised when MCP connection fails."""
-
     pass
 
 
-class BoxMCPToolError(BoxMCPClientError):
+class BoxMCPToolError(BoxError):
     """Exception raised when MCP tool execution fails."""
-
     pass
 
 
@@ -110,9 +118,15 @@ class BoxMCPClient:
             self._connected = True
             logger.info(f"Successfully connected to Box MCP server via {self.connection_type}")
             
+        except BoxMCPConnectionError:
+            raise
         except Exception as e:
-            logger.error(f"Failed to connect to Box MCP server: {e}")
-            raise BoxMCPConnectionError(f"MCP connection failed: {e}") from e
+            logger.error(f"Failed to connect to Box MCP server: {e}", exc_info=True)
+            raise BoxMCPConnectionError(
+                message=f"MCP connection failed: {e}",
+                user_message="Unable to connect to document storage service. Please try again later.",
+                details={"connection_type": self.connection_type}
+            ) from e
 
     async def _connect_sse(self) -> None:
         """Connect to MCP server via SSE."""
@@ -187,7 +201,7 @@ class BoxMCPClient:
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
-        retry=retry_if_exception_type(BoxMCPToolError),
+        retry=retry_if_exception_type((BoxMCPToolError, NetworkError)),
     )
     async def _call_tool(self, tool_name: str, arguments: Dict[str, Any]) -> MCPToolResult:
         """Call an MCP tool with retry logic.
@@ -201,6 +215,7 @@ class BoxMCPClient:
             
         Raises:
             BoxMCPToolError: If tool execution fails after retries
+            RetryExhaustedError: If all retry attempts are exhausted
         """
         self._ensure_connected()
         
@@ -217,14 +232,36 @@ class BoxMCPClient:
             if hasattr(result, 'isError') and result.isError:
                 error_msg = str(content)
                 logger.error(f"MCP tool {tool_name} returned error: {error_msg}")
+                
+                # Check for specific error types
+                if "not found" in error_msg.lower():
+                    raise BoxFileNotFoundError(
+                        message=f"File not found: {error_msg}",
+                        user_message="The requested document was not found",
+                        details={"tool": tool_name}
+                    )
+                
                 return MCPToolResult(success=False, data=None, error=error_msg)
             
             logger.debug(f"MCP tool {tool_name} succeeded")
             return MCPToolResult(success=True, data=content, error=None)
             
+        except (BoxFileNotFoundError, BoxMCPConnectionError):
+            raise
+        except RetryError as e:
+            logger.error(f"MCP tool {tool_name} failed after all retries: {e}", exc_info=True)
+            raise RetryExhaustedError(
+                message=f"Tool {tool_name} failed after multiple attempts: {e}",
+                user_message="Service is temporarily unavailable after multiple attempts. Please try again later.",
+                details={"tool": tool_name, "max_attempts": 3}
+            ) from e
         except Exception as e:
-            logger.error(f"MCP tool {tool_name} failed: {e}")
-            raise BoxMCPToolError(f"Tool {tool_name} execution failed: {e}") from e
+            logger.error(f"MCP tool {tool_name} failed: {e}", exc_info=True)
+            raise BoxMCPToolError(
+                message=f"Tool {tool_name} execution failed: {e}",
+                user_message="Document operation failed. Please try again.",
+                details={"tool": tool_name}
+            ) from e
 
     async def search_files(
         self, query: str, folder_id: Optional[str] = None
@@ -266,30 +303,52 @@ class BoxMCPClient:
             File contents as bytes
             
         Raises:
-            BoxMCPToolError: If file read fails
+            BoxFileNotFoundError: If file is not found
+            BoxError: If file read fails
         """
-        arguments = {"file_id": file_id}
-        result = await self._call_tool("box_read_tool", arguments)
+        try:
+            arguments = {"file_id": file_id}
+            result = await self._call_tool("box_read_tool", arguments)
+            
+            if not result.success:
+                if "not found" in (result.error or "").lower():
+                    raise BoxFileNotFoundError(
+                        message=f"File {file_id} not found: {result.error}",
+                        user_message="The requested document was not found",
+                        details={"file_id": file_id}
+                    )
+                raise BoxError(
+                    message=f"Failed to read file {file_id}: {result.error}",
+                    user_message="Unable to read document. Please try again.",
+                    details={"file_id": file_id}
+                )
+            
+            # Convert result data to bytes if needed
+            if isinstance(result.data, bytes):
+                return result.data
+            elif isinstance(result.data, str):
+                return result.data.encode('utf-8')
+            elif isinstance(result.data, list):
+                # MCP might return content as list of text content blocks
+                content = ""
+                for item in result.data:
+                    if hasattr(item, 'text'):
+                        content += item.text
+                    elif isinstance(item, dict) and 'text' in item:
+                        content += item['text']
+                return content.encode('utf-8')
+            else:
+                return str(result.data).encode('utf-8')
         
-        if not result.success:
-            raise BoxMCPToolError(f"Failed to read file {file_id}: {result.error}")
-        
-        # Convert result data to bytes if needed
-        if isinstance(result.data, bytes):
-            return result.data
-        elif isinstance(result.data, str):
-            return result.data.encode('utf-8')
-        elif isinstance(result.data, list):
-            # MCP might return content as list of text content blocks
-            content = ""
-            for item in result.data:
-                if hasattr(item, 'text'):
-                    content += item.text
-                elif isinstance(item, dict) and 'text' in item:
-                    content += item['text']
-            return content.encode('utf-8')
-        else:
-            return str(result.data).encode('utf-8')
+        except (BoxFileNotFoundError, BoxError):
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error reading file {file_id}: {e}", exc_info=True)
+            raise BoxError(
+                message=f"Unexpected error reading file {file_id}: {e}",
+                user_message="Unable to read document. Please try again.",
+                details={"file_id": file_id}
+            ) from e
 
     async def upload_file(
         self, folder_id: str, file_name: str, content: bytes
@@ -303,19 +362,42 @@ class BoxMCPClient:
             
         Returns:
             MCPToolResult containing uploaded file information
+            
+        Raises:
+            BoxUploadError: If file upload fails
         """
-        # Convert bytes to base64 or string as needed by MCP tool
-        import base64
-        content_str = base64.b64encode(content).decode('utf-8')
+        try:
+            # Convert bytes to base64 or string as needed by MCP tool
+            import base64
+            content_str = base64.b64encode(content).decode('utf-8')
+            
+            arguments = {
+                "folder_id": folder_id,
+                "file_name": file_name,
+                "content": content_str,
+                "is_base64": True,
+            }
+            
+            result = await self._call_tool("box_upload_file_from_content_tool", arguments)
+            
+            if not result.success:
+                raise BoxUploadError(
+                    message=f"Failed to upload file {file_name}: {result.error}",
+                    user_message="Failed to save document. Please try again.",
+                    details={"file_name": file_name, "folder_id": folder_id}
+                )
+            
+            return result
         
-        arguments = {
-            "folder_id": folder_id,
-            "file_name": file_name,
-            "content": content_str,
-            "is_base64": True,
-        }
-        
-        return await self._call_tool("box_upload_file_from_content_tool", arguments)
+        except BoxUploadError:
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error uploading file {file_name}: {e}", exc_info=True)
+            raise BoxUploadError(
+                message=f"Unexpected error uploading file {file_name}: {e}",
+                user_message="Failed to save document. Please try again.",
+                details={"file_name": file_name, "folder_id": folder_id}
+            ) from e
 
     async def create_folder(
         self, parent_folder_id: str, folder_name: str
