@@ -109,10 +109,26 @@ pytest --cov=app --cov=models --cov=services --cov-report=html
 pytest tests/unit/
 ```
 
+### Run only integration tests:
+```bash
+pytest tests/integration/ -v -s
+```
+
+### Run SEC to Box E2E test:
+```bash
+# Using the helper script
+./scripts/test_sec_to_box.sh
+
+# Or directly with pytest
+pytest tests/integration/test_sec_to_box_e2e.py -v -s
+```
+
 ### Run only property-based tests:
 ```bash
 pytest tests/properties/
 ```
+
+See `tests/integration/README.md` for detailed information about integration tests.
 
 ## Project Structure
 

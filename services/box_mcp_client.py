@@ -58,6 +58,7 @@ class BoxMCPClient:
         server_path: Optional[str] = None,
         server_url: Optional[str] = None,
         max_retries: Optional[int] = None,
+        auth_token: Optional[str] = None,
     ):
         """Initialize Box MCP Client.
         
@@ -65,10 +66,12 @@ class BoxMCPClient:
             server_path: Path to the Box MCP server executable (for stdio)
             server_url: URL to the Box MCP server (for SSE, e.g., http://localhost:8005/sse)
             max_retries: Maximum number of retries for failed operations
+            auth_token: Authentication token for SSE connections
         """
         self.server_path = server_path or os.getenv("BOX_MCP_SERVER_PATH")
         self.server_url = server_url or os.getenv("BOX_MCP_SERVER_URL")
         self.max_retries = max_retries or int(os.getenv("MAX_RETRIES", "3"))
+        self.auth_token = auth_token or os.getenv("BOX_MCP_SERVER_AUTH_TOKEN")
         
         # Must have either server_path or server_url
         if not self.server_path and not self.server_url:
@@ -115,8 +118,16 @@ class BoxMCPClient:
         """Connect to MCP server via SSE."""
         logger.info(f"Connecting to Box MCP server via SSE at {self.server_url}...")
         
+        # Add auth token to URL if available
+        url = self.server_url
+        if self.auth_token:
+            # Add token as query parameter
+            separator = '&' if '?' in url else '?'
+            url = f"{url}{separator}token={self.auth_token}"
+            logger.debug("Using authentication token for SSE connection")
+        
         # Create SSE client context
-        self._context = sse_client(self.server_url)
+        self._context = sse_client(url)
         self._read, self._write = await self._context.__aenter__()
         
         # Create session
@@ -131,9 +142,10 @@ class BoxMCPClient:
         logger.info(f"Connecting to Box MCP server via stdio at {self.server_path}...")
         
         # Configure server parameters for stdio communication
+        # Use "uv run" to execute the Python script
         server_params = StdioServerParameters(
-            command=self.server_path,
-            args=[],
+            command="uv",
+            args=["run", self.server_path],
             env=None,
         )
         
