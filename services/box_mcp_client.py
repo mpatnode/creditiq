@@ -242,7 +242,7 @@ class BoxMCPClient:
         if folder_id:
             arguments["ancestor_folder_ids"] = folder_id
         
-        return await self._call_tool("box_search", arguments)
+        return await self._call_tool("box_search_tool", arguments)
 
     async def get_file_info(self, file_id: str) -> MCPToolResult:
         """Get metadata about a specific file.
@@ -269,7 +269,7 @@ class BoxMCPClient:
             BoxMCPToolError: If file read fails
         """
         arguments = {"file_id": file_id}
-        result = await self._call_tool("box_read_file", arguments)
+        result = await self._call_tool("box_read_tool", arguments)
         
         if not result.success:
             raise BoxMCPToolError(f"Failed to read file {file_id}: {result.error}")
@@ -312,9 +312,10 @@ class BoxMCPClient:
             "folder_id": folder_id,
             "file_name": file_name,
             "content": content_str,
+            "is_base64": True,
         }
         
-        return await self._call_tool("box_upload_file", arguments)
+        return await self._call_tool("box_upload_file_from_content_tool", arguments)
 
     async def create_folder(
         self, parent_folder_id: str, folder_name: str
@@ -333,7 +334,7 @@ class BoxMCPClient:
             "name": folder_name,
         }
         
-        return await self._call_tool("box_create_folder", arguments)
+        return await self._call_tool("box_folder_create_tool", arguments)
 
     async def update_file_metadata(
         self, file_id: str, metadata: Dict[str, Any]
@@ -370,13 +371,21 @@ class BoxMCPClient:
         Returns:
             MCPToolResult containing Box AI response
         """
-        arguments = {
-            "items": [{"type": "file", "id": file_id} for file_id in file_ids],
-            "prompt": prompt,
-            "mode": mode,
-        }
+        # Use the appropriate tool based on number of files
+        if len(file_ids) == 1:
+            tool_name = "box_ai_ask_file_single_tool"
+            arguments = {
+                "file_id": file_ids[0],
+                "prompt": prompt,
+            }
+        else:
+            tool_name = "box_ai_ask_file_multi_tool"
+            arguments = {
+                "file_ids": file_ids,
+                "prompt": prompt,
+            }
         
-        return await self._call_tool("box_ai_ask", arguments)
+        return await self._call_tool(tool_name, arguments)
 
     async def box_ai_extract(
         self,
@@ -398,7 +407,7 @@ class BoxMCPClient:
             "fields": fields,
         }
         
-        return await self._call_tool("box_ai_extract", arguments)
+        return await self._call_tool("box_ai_extract_structured_using_fields_tool", arguments)
 
     async def __aenter__(self):
         """Async context manager entry."""
