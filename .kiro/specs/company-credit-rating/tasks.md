@@ -79,7 +79,7 @@
   - Test financial data document upload
   - _Requirements: 3.2, 3.3_
 
-- [-] 6. Implement Rating Engine component
+- [x] 6. Implement Rating Engine component
   - Create RatingEngine class in services/rating_engine.py that orchestrates the rating workflow
   - Implement calculate_rating method that coordinates:
     - Financial data retrieval via FinancialDataRetriever
